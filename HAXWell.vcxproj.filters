@@ -1,0 +1,54 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="include">
+      <UniqueIdentifier>{df4cd8b8-4a19-41aa-8a44-ec7cdf52ba6b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src">
+      <UniqueIdentifier>{a89fbfd3-1b6b-4af5-898f-695969f78fa3}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\HAXWell.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\GENCoder.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\GENDisassembler.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\GENIsa.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\HAXWell_Utils.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="Misc.h" />
+    <ClInclude Include="include\Timer.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\GENCoder.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\GENDisassembler.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\GENIsa.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\HAXWell.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\HAXWell_Utils.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="ThreadTimings.cpp" />
+    <ClCompile Include="Misc.cpp" />
+    <ClCompile Include="InstructionIssue.cpp" />
+    <ClCompile Include="InstructionCacheCliff.cpp" />
+    <ClCompile Include="BlockReadCost.cpp" />
+    <ClCompile Include="ScatteredReadCost.cpp" />
+  </ItemGroup>
+</Project>
