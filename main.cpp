@@ -15,6 +15,8 @@ void IssueTest();
 void BlockReadTest();
 void ScatteredReadTest();
 
+void Nbody();
+
 int main( int argc, char* argv[] )
 {
     HAXWell::Init(true);
@@ -26,7 +28,7 @@ int main( int argc, char* argv[] )
     //ThreadTimings( SUBSLICE_EU_COUNT*6, 70, 0 );    // fat groups
     //ThreadTimings( 7, SUBSLICE_EU_COUNT*6*10, 0 );  // skinnier groups
 
-    IssueTest();
+    //IssueTest();
     //BlockReadTest();
     //ScatteredReadTest();
 
@@ -51,6 +53,7 @@ int main( int argc, char* argv[] )
       InstructionIssueTest(1,16); 
       */
    
+    Nbody();
 
 
     return 0;

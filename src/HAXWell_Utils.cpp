@@ -112,30 +112,33 @@ namespace HAXWell
 
         GEN::Decoder decoder;
 
+        
         // All GEN threads must in a SEND instruction with the 'EOT' field set 
         //     Find this instruction
+        
         size_t nSendInstruction = 0;
         while( nSendInstruction < nBlobLength )
         {
             const unsigned char* pWhere = pBytes + nSendInstruction;
+            
             GEN::Operations eOp = decoder.GetOperation(pBytes + nSendInstruction);
             if( eOp == GEN::OP_SEND )
             {
                 GEN::SendInstruction inst;
                 if( decoder.Decode( &inst, pWhere ) )
                 {
-                    if( inst.IsEOT() )
+                    if( !inst.IsDescriptorInRegister() && inst.IsEOT() )
                         break;
                 }
             }
-
+         
             nSendInstruction++;
         }
 
-
         if( nSendInstruction == nBlobLength )
             return false;
-
+        
+        
         // Now work our way backwards to the first non-instruction we see
         //  This won't work if there exists a native instruction whose upper half
         //   happens to exactly match a compressed one, but its the best we've got
@@ -158,6 +161,11 @@ namespace HAXWell
                 // legal compacted instruction
                 scan = p2x;
             }
+            else if( eOp2 != GEN::OP_ILLEGAL && eOp2 != GEN::NOT_AN_OP && len2 == 16 )
+            {
+                // this means the last iteration mistook the upper half of a native instruction for a compressed instruction
+                scan = p2x;
+            }
             else if( eOp4 != GEN::OP_ILLEGAL && eOp4 != GEN::NOT_AN_OP && len4==16 )
             {
                 // legal native instruction
@@ -169,6 +177,7 @@ namespace HAXWell
                 break;
             }
         }
+
 
         if( scan < pBytes )
             return false;

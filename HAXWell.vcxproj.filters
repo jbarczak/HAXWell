@@ -50,5 +50,6 @@
     <ClCompile Include="InstructionCacheCliff.cpp" />
     <ClCompile Include="BlockReadCost.cpp" />
     <ClCompile Include="ScatteredReadCost.cpp" />
+    <ClCompile Include="Nbody.cpp" />
   </ItemGroup>
 </Project>

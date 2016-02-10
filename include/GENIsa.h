@@ -268,6 +268,23 @@ namespace GEN
         unsigned w : 2;
     };
 
+    class FlagReference
+    {
+    public:
+        FlagReference() : m_nReg(0), m_nSubReg(0){}
+        FlagReference( size_t nReg, size_t nSubReg ) : m_nReg(nReg), m_nSubReg(nSubReg){}
+
+        void Set( size_t nReg, size_t nSubReg ) { 
+            m_nReg = nReg;
+            m_nSubReg = nSubReg;
+        }
+        size_t GetReg() const { return m_nReg; }
+        size_t GetSubReg() const { return m_nSubReg; }
+
+    private:
+        uint8 m_nReg;
+        uint8 m_nSubReg;
+    };
 
     class RegReference
     {
@@ -385,13 +402,17 @@ namespace GEN
     {
     public:
 
-        SourceOperand( ) : m_eDataType(DT_INVALID), m_bImmediate(false){}
-        SourceOperand( DataTypes eType ) : m_eDataType(eType), m_bImmediate(true){};
+        SourceOperand( ) : m_eDataType(DT_INVALID), m_bImmediate(false), m_eModifier(SM_NONE){}
+        SourceOperand( DataTypes eType ) : m_eDataType(eType), m_bImmediate(true),m_eModifier(SM_NONE){};
         SourceOperand( DataTypes eType, const RegisterRegion& reg ) : m_eDataType(eType), m_Reg(reg), m_bImmediate(false){}
+        
+        SourceOperand( DataTypes eType, SourceModifiers eMod ) : m_eDataType(eType), m_bImmediate(true),m_eModifier(eMod){};
+        SourceOperand( DataTypes eType, const RegisterRegion& reg, SourceModifiers eMod ) : m_eDataType(eType), m_Reg(reg), m_bImmediate(false) ,m_eModifier(eMod){}
 
         bool IsImmediate() const { return m_bImmediate != 0; }
         DataTypes GetDataType() const { return (DataTypes)m_eDataType; }
         RegisterRegion GetRegRegion() const { return m_Reg; }
+        SourceModifiers GetModifier() const { return (SourceModifiers)m_eModifier; };
 
         Swizzle GetSwizzle() const { return m_Swizzle; }
 
@@ -405,6 +426,7 @@ namespace GEN
         Swizzle m_Swizzle;
         DataTypes m_eDataType;
         uint8 m_bImmediate;
+        uint8 m_eModifier;
         RegisterRegion m_Reg;
     };
 
@@ -482,7 +504,15 @@ namespace GEN
         unsigned m_bMsgDescriptorFromReg : 1;
         ////////////////////////////////////
 
-        uint8 m_ImmediateOperand[8];
+        union
+        {
+            uint8 m_ImmediateOperand[8];
+            struct
+            {
+                int32 JIP;
+                int32 UIP;
+            } m_BranchOffsets;
+        };
     
         union
         {
@@ -496,6 +526,7 @@ namespace GEN
         SourceOperand m_Source0;
         SourceOperand m_Source1;
         SourceOperand m_Source2;
+        FlagReference m_Flags;
 
     };
 
@@ -526,7 +557,9 @@ namespace GEN
             memcpy( &m_ImmediateOperand, &imm, 4 );
         }
 
-
+            
+        ConditionalModifiers GetConditionModifier() const { return (ConditionalModifiers)m_eCondModifier; }
+    
 
         size_t GetExecSize() const { return m_nExecSize; }
         const DestOperand& GetDest() const { return m_Dest; }
@@ -560,19 +593,23 @@ namespace GEN
             m_Source1 = src1;
             memcpy( &m_ImmediateOperand, &imm, 4 );
         }
-        
+           
+        ConditionalModifiers GetConditionModifier() const { return (ConditionalModifiers)m_eCondModifier; }
+    
         size_t GetExecSize() const { return m_nExecSize; }
         const DestOperand& GetDest() const { return m_Dest; }
         const SourceOperand& GetSource0() const { return m_Source0; };
         const SourceOperand& GetSource1() const { return m_Source1; };
     
+        FlagReference GetFlagReference() const { return m_Flags; }
+        void SetFlagReference( const FlagReference& rFlag ) { m_Flags = rFlag; }
     };
 
     class TernaryInstruction : public Instruction
     {
     public:
         TernaryInstruction() : Instruction(IC_TERNARY) {}
-        ConditionalModifiers GetConditionModifier() const;
+        ConditionalModifiers GetConditionModifier() const { return (ConditionalModifiers)m_eCondModifier; }
     
         size_t GetExecSize() const { return m_nExecSize; }
           
@@ -662,11 +699,15 @@ namespace GEN
     {
     public:
         BranchInstruction() : Instruction( IC_BRANCH ){}
+        size_t GetExecSize() const { return m_nExecSize; }
+        int GetJIP() const { return m_BranchOffsets.JIP; }
+        int GetUIP() const { return m_BranchOffsets.UIP; }
     };
 
 
     
     const char* OperationToString( Operations op );
+    const char* ConditionalModifierToString( ConditionalModifiers op );
 
     const char* SharedFunctionToString( SharedFunctionIDs eFunc );
     

@@ -98,6 +98,25 @@ namespace GEN
         }
     }
 
+
+    const char* ConditionalModifierToString( ConditionalModifiers m )
+    {
+        switch(m)
+        {
+        default: return "????";
+        case CM_NONE            : return "";
+        case CM_ZERO            : return "eq";
+        case CM_NOTZERO         : return "ne";
+        case CM_GREATER_THAN    : return "gt";
+        case CM_GREATER_EQUAL   : return "ge";
+        case CM_LESS_THAN       : return "lt";
+        case CM_LESS_EQUAL      : return "le";
+        case CM_SIGNED_OVERFLOW : return "so";
+        case CM_UNORDERED       : return "uo";
+        }
+    }
+
+
     SendInstruction SendEOT( uint32 nSourceGPR )
     {
         SendInstruction eot( SFID_SPAWNER, 0x02000010, 

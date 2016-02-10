@@ -273,6 +273,20 @@ namespace GEN
             ENUM( MATH_IDIV_REMAINDER,   0xD )
         END_TRANSLATOR(MathFunctionIDs,MathFunctions,MATH_INVALID)
 
+        
+        BEGIN_TRANSLATOR(ConditionalModifiers,CondModifiers)
+            ENUM( CM_NONE            ,0x00 )
+            ENUM( CM_ZERO            ,0x01 )
+            ENUM( CM_NOTZERO         ,0x02 )
+            ENUM( CM_GREATER_THAN    ,0x03 )
+            ENUM( CM_GREATER_EQUAL   ,0x04 )
+            ENUM( CM_LESS_THAN       ,0x05 )
+            ENUM( CM_LESS_EQUAL      ,0x06 )
+            ENUM( CM_SIGNED_OVERFLOW ,0x08 )
+            ENUM( CM_UNORDERED       ,0x09 )
+        END_TRANSLATOR(ConditionalModifiers,CondModifiers,MATH_INVALID)
+
+
 
 
 
@@ -615,6 +629,13 @@ namespace GEN
             RegisterFields Src2;
         };
 
+        
+        void FillFlagFields( InstructionFields& rFields, const GEN::FlagReference& rFlags )
+        {
+            rFields.dwFlagRegNum = rFlags.GetReg();
+            rFields.dwFlagSubRegNum = rFlags.GetSubReg();
+        }
+
 
         void FillRegFields( RegisterFields& reg,  const GEN::RegisterRegion& rRegion, DataTypes eType )
         {
@@ -651,9 +672,9 @@ namespace GEN
         void FillSourceRegFields( RegisterFields& reg, const GEN::SourceOperand& rOperand )
         {
             // TODO: Swizzle
-            // TODO: Modifiers
             //
-            reg.bAlign16 = false;
+            reg.dwModifier = rOperand.GetModifier();
+            reg.bAlign16   = false;
             if( rOperand.IsImmediate() )
             {
                 reg.dwDataType  = Encode_ImmDataTypes(rOperand.GetDataType() );
@@ -734,6 +755,9 @@ namespace GEN
             WriteBits( pLoc, rFields.Src1.dwRegFile,  43, 42 );
             WriteBits( pLoc, rFields.Src1.dwDataType, 46, 44 );
     
+            WriteBit( pLoc, rFields.dwFlagRegNum,    90 );
+            WriteBit( pLoc, rFields.dwFlagSubRegNum, 89 );
+
             if( bAlign16 )
             {
                 if( rFields.Dest.bIsIndirect )
@@ -903,7 +927,7 @@ namespace GEN
 
             // dest width/stride follows from exec size 
             fields.Dest.dwWidth   = fields.nExecSize;
-            fields.Dest.dwVStride = Encode_VStride(Decode_Width(fields.nExecSize)*Decode_HStride(fields.Dest.dwHStride));
+            fields.Dest.dwVStride = Encode_VStride(Decode_Width(fields.Dest.dwWidth)*Decode_HStride(fields.Dest.dwHStride));
         
 
             ReadSourceRegFields(fields.Src0,pIn+8, align1);
@@ -917,8 +941,80 @@ namespace GEN
             fields.Src1.bAlign16 = bAlign16;
             fields.Src2.bAlign16 = bAlign16;
 
+            fields.dwFlagRegNum    = ReadBit(pIn,90);
+            fields.dwFlagSubRegNum = ReadBit(pIn,89);
         }
 
+        void ReadInstructionFieldsThreeSrc( InstructionFields& fields, const unsigned char* pIn )
+        {
+            memset(&fields,0,sizeof(fields));
+            fields.Src0.bAlign16 = true;
+            fields.Src1.bAlign16 = true;
+            fields.Src2.bAlign16 = true;
+            fields.Dest.bAlign16 = true;
+            fields.dwOpcode              = ReadBits(pIn,7,0);
+            fields.bMaskControl          = ReadBits(pIn,9,9);
+            fields.bNoDDChk              = ReadBit(pIn,11);
+            fields.bNoDDClr              = ReadBit(pIn,10);
+            fields.nQtrControl           = ReadBits(pIn,13,12);
+            fields.nThreadControl        = ReadBits(pIn,15,14);
+            fields.nPredControl          = ReadBits(pIn,19,16);
+            fields.bPredInvert           = ReadBits(pIn,20,20);
+            fields.nExecSize             = ReadBits(pIn,23,21);
+            fields.nCondModifier         = ReadBits(pIn,27,24);
+            fields.bAccumWrite           = ReadBits(pIn,28,28);
+            fields.bSat                  = ReadBits(pIn,31,31);
+
+            fields.dwFlagSubRegNum = ReadBit(pIn,33);
+            fields.dwFlagRegNum = ReadBit(pIn,34);
+            
+            fields.Src0.dwModifier = ReadBits(pIn,37,36);
+            fields.Src1.dwModifier = ReadBits(pIn,39,38);
+            fields.Src2.dwModifier = ReadBits(pIn,41,40);
+            
+            DWORD dwSrcType = ReadBits(pIn,43,42);
+            fields.Src0.dwDataType = dwSrcType;
+            fields.Src1.dwDataType = dwSrcType;
+            fields.Src2.dwDataType = dwSrcType;
+            fields.Dest.dwDataType = ReadBits(pIn,45,44);
+
+            fields.dwDestWriteMask = ReadBits(pIn,52,49);
+  
+            fields.Dest.dwRegFile   = RF_GRF;
+            fields.Src0.dwRegFile = RF_GRF;
+            fields.Src1.dwRegFile = RF_GRF;
+            fields.Src2.dwRegFile = RF_GRF;
+
+            fields.Dest.dwRegNum        = ReadBits(pIn,63,56);
+            fields.Dest.dwSubRegNum     = ReadBits(pIn,55,53)<<2;
+
+            fields.Src0.dwChanSel       = ReadBits(pIn, 72,65 );
+            fields.Src0.dwSubRegNum     = ReadBits(pIn,75,73)<<2;
+            fields.Src0.dwRegNum        = ReadBits(pIn,83,76);
+            
+            fields.Src1.dwChanSel       = ReadBits(pIn,93,86);
+            fields.Src1.dwSubRegNum     = ReadBits(pIn,95,94)<<2;
+            fields.Src1.dwRegNum        = ReadBits(pIn,104,97);
+
+            fields.Src2.dwChanSel       = ReadBits(pIn,114,107);
+            fields.Src2.dwSubRegNum     = ReadBits(pIn,117,115)<<2;
+            fields.Src2.dwRegNum        = ReadBits(pIn,125,118);
+
+            fields.Src0.dwVStride = Encode_VStride(8);
+            fields.Src1.dwVStride = Encode_VStride(8);
+            fields.Src2.dwVStride = Encode_VStride(8);
+            fields.Src0.dwWidth   = Encode_Width(8);
+            fields.Src1.dwWidth   = Encode_Width(8);
+            fields.Src2.dwWidth   = Encode_Width(8);
+            fields.Src0.dwHStride = 1;
+            fields.Src1.dwHStride = 1;
+            fields.Src2.dwHStride = 1;
+            fields.Dest.dwHStride = 1;
+            fields.Dest.dwVStride = Encode_VStride(8);
+            fields.Dest.dwWidth = Encode_Width(8);
+
+
+        }
       
 
 
@@ -952,15 +1048,16 @@ namespace GEN
 
         GEN::SourceOperand InterpretSource( RegisterFields& rReg )
         {
+            SourceModifiers eMod = (SourceModifiers) rReg.dwModifier;
             if( rReg.dwRegFile == RF_IMM )
             {
                 DataTypes eDataType = Decode_ImmDataTypes( rReg.dwDataType );
-                return GEN::SourceOperand(eDataType);
+                return GEN::SourceOperand(eDataType, eMod);
             }
             else
             {
                 DataTypes eDataType = Decode_RegDataTypes( rReg.dwDataType );
-                return GEN::SourceOperand(eDataType,InterpretRegisterRegion(rReg));
+                return GEN::SourceOperand(eDataType,InterpretRegisterRegion(rReg), eMod);
             }
         }
 
@@ -970,6 +1067,10 @@ namespace GEN
             return GEN::DestOperand(eDataType,InterpretRegisterRegion(rInstruction.Dest), rInstruction.dwDestWriteMask);
         }
 
+        GEN::FlagReference InterpretFlagReference( InstructionFields& rInst )
+        {
+            return GEN::FlagReference( rInst.dwFlagRegNum, rInst.dwFlagSubRegNum );
+        }
 
 
     }
@@ -1149,8 +1250,17 @@ namespace GEN
         pInst->m_eOp    = eOp;
         pInst->m_eClass = IC_TERNARY;
       
+        _INTERNAL::InstructionFields fields;
+        _INTERNAL::ReadInstructionFieldsThreeSrc( fields, pIn );
 
-        // todo
+        pInst->m_nExecSize    = _INTERNAL::Decode_ExecSize(fields.nExecSize);
+        pInst->m_bNoWriteMask = fields.bMaskControl;
+        pInst->m_bNoDDChk     = fields.bNoDDChk;
+        pInst->m_Dest         = _INTERNAL::InterpretDest( fields );
+        pInst->m_Source0      = _INTERNAL::InterpretSource(fields.Src0);
+        pInst->m_Source1      = _INTERNAL::InterpretSource(fields.Src1);
+        pInst->m_Source2      = _INTERNAL::InterpretSource(fields.Src2);
+
         return 16;
     }
 
@@ -1197,7 +1307,8 @@ namespace GEN
                 pInst->m_eClass  = IC_UNARY;
                 pInst->m_Dest    = _INTERNAL::InterpretDest(fields);
                 pInst->m_Source0 = _INTERNAL::InterpretSource(fields.Src0);
-
+                pInst->m_eCondModifier = _INTERNAL::Decode_CondModifiers(fields.nCondModifier);
+                pInst->m_Flags          = _INTERNAL::InterpretFlagReference(fields);
                 return pInst->m_Dest.IsValid() && pInst->m_Source0.IsValid();
             }
             break;
@@ -1230,34 +1341,49 @@ namespace GEN
         case OP_PLN     : // plane evaluation
             {
                 // two source arithmetic
-                pInst->m_eClass  = IC_BINARY;
-                pInst->m_Dest    = _INTERNAL::InterpretDest(fields);
-                pInst->m_Source0 = _INTERNAL::InterpretSource(fields.Src0);
-                pInst->m_Source1 = _INTERNAL::InterpretSource(fields.Src1);
-            
+                pInst->m_eClass         = IC_BINARY;
+                pInst->m_Dest           = _INTERNAL::InterpretDest(fields);
+                pInst->m_Source0        = _INTERNAL::InterpretSource(fields.Src0);
+                pInst->m_Source1        = _INTERNAL::InterpretSource(fields.Src1);
+                pInst->m_eCondModifier  = _INTERNAL::Decode_CondModifiers(fields.nCondModifier);
+                pInst->m_Flags          = _INTERNAL::InterpretFlagReference(fields);
                 return pInst->m_Dest.IsValid() && pInst->m_Source0.IsValid() && pInst->m_Source1.IsValid();
             }
             break; // two source arithmetic
 
             // TODO....
 
-            // one source banch
-        case OP_JMPI    : // indexed jump
-        case OP_BRD     : // diverging branch
-        case OP_BRC     : // converging branch
+            // 'if' instruction has UIP and JIP
+            // 
+            //  else 
+        case OP_IF      :
         case OP_ELSE    :
         case OP_WHILE   :
         case OP_BREAK   :
         case OP_CONT    :
+        case OP_ENDIF   :
+            {
+                const int16* pWords = (const int16*)pInstructionBytes;
+                int16 JIP = pWords[6];
+                int16 UIP = pWords[7];
+                pInst->m_BranchOffsets.JIP = JIP;
+                pInst->m_BranchOffsets.UIP = UIP;
+                pInst->m_eClass = IC_BRANCH;
+                return true;
+            }
+            break;
+        
+
+            // one source banch
+        case OP_JMPI    : // indexed jump
+        case OP_BRD     : // diverging branch
+        case OP_BRC     : // converging branch
         case OP_HALT    :
         case OP_CALLA   : // call absolute
         case OP_CALL    :
         case OP_RETURN  :
-        case OP_ENDIF   :
             break;
         
-            // two source branch
-        case OP_IF      :
         case OP_CASE    :
             break;
 
@@ -1355,13 +1481,27 @@ namespace GEN
                     const BinaryInstruction& it = static_cast<const BinaryInstruction&> (rInst);
                     fields.dwOpcode  = _INTERNAL::Encode_Operations(rInst.GetOperation());
                     fields.nExecSize = _INTERNAL::Encode_ExecSize(it.GetExecSize());
-                       fields.IMM32 = it.GetImmediate<uint32>();
+                    fields.IMM32 = it.GetImmediate<uint32>();
                     fields.IMM64 = it.GetImmediate<uint64>();
                  
                     _INTERNAL::FillDestRegFields( fields.Dest, it.GetDest() );
                     _INTERNAL::FillSourceRegFields( fields.Src0, it.GetSource0() );
                     _INTERNAL::FillSourceRegFields( fields.Src1, it.GetSource1() );
-                    
+                    _INTERNAL::FillFlagFields( fields, it.GetFlagReference() );
+                  
+                    // Docs state that the 'switch threads' threadmode must be used if dest is null
+                    //  Smells like a HW bug.  Force it here just in case
+                    switch( rInst.GetOperation() )
+                    {
+                    case OP_CMP:
+                    case OP_CMPN:
+                        {
+                            if( it.GetDest().GetRegRegion().GetBaseRegister().GetRegType() == REG_NULL )
+                                fields.nThreadControl = TC_SWITCH;
+                        }
+                        break;
+                    }
+
                     _INTERNAL::WriteInstructionFields2Src(pOutputBytes, fields, rInst.GetOperation() );
                 }
                 break;

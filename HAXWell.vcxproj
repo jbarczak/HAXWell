@@ -79,6 +79,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="BlockReadCost.cpp" />
+    <ClCompile Include="Nbody.cpp" />
     <ClCompile Include="ScatteredReadCost.cpp" />
     <ClCompile Include="InstructionCacheCliff.cpp" />
     <ClCompile Include="Misc.cpp" />

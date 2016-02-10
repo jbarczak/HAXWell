@@ -181,25 +181,26 @@ namespace GEN
 
         void FormatSource( char* pBuffer, const GEN::SourceOperand& rSrc, const GEN::Instruction& rInstruction )
         {
-            // TODO: src modifiers
             // TODO: swizzles
+            char tmp[64];
+
             if( rSrc.IsImmediate() )
             {
                 switch( rSrc.GetDataType() )
                 {
-                case DT_U32:    sprintf(pBuffer, "%u", rInstruction.GetImmediate<uint32>()); break;
-                case DT_S32:    sprintf(pBuffer, "%d", rInstruction.GetImmediate<int32>());  break;
-                case DT_U16:    sprintf(pBuffer, "%u", rInstruction.GetImmediate<uint16>()); break;
-                case DT_S16:    sprintf(pBuffer, "%d", rInstruction.GetImmediate<int16>());  break;
-                case DT_U8:     sprintf(pBuffer, "%u", rInstruction.GetImmediate<uint8>());  break;
-                case DT_S8:     sprintf(pBuffer, "%d", rInstruction.GetImmediate<int8>());   break;
-                case DT_F64:    sprintf(pBuffer, "%f", rInstruction.GetImmediate<float>());  break;
-                case DT_F32:    sprintf(pBuffer, "%f", rInstruction.GetImmediate<double>()); break;
+                case DT_U32:    sprintf(tmp, "%u", rInstruction.GetImmediate<uint32>()); break;
+                case DT_S32:    sprintf(tmp, "%d", rInstruction.GetImmediate<int32>());  break;
+                case DT_U16:    sprintf(tmp, "%u", rInstruction.GetImmediate<uint16>()); break;
+                case DT_S16:    sprintf(tmp, "%d", rInstruction.GetImmediate<int16>());  break;
+                case DT_U8:     sprintf(tmp, "%u", rInstruction.GetImmediate<uint8>());  break;
+                case DT_S8:     sprintf(tmp, "%d", rInstruction.GetImmediate<int8>());   break;
+                case DT_F64:    sprintf(tmp, "%f", rInstruction.GetImmediate<float>());  break;
+                case DT_F32:    sprintf(tmp, "%f", rInstruction.GetImmediate<double>()); break;
                 case DT_VEC_HALFBYTE_UINT:
                 case DT_VEC_HALFBYTE_SINT:  // immediates only
                 case DT_VEC_HALFBYTE_FLOAT:
                 default:
-                    sprintf(pBuffer, "IMM??" );
+                    sprintf(tmp, "IMM??" );
                 }
             }
             else
@@ -207,19 +208,46 @@ namespace GEN
                 size_t nExecSize = 0;
                 switch( rInstruction.GetClass() )
                 {
-                case IC_BINARY:    nExecSize = static_cast<const UnaryInstruction&>(rInstruction).GetExecSize(); break;
+                case IC_BINARY:    nExecSize = static_cast<const BinaryInstruction&>(rInstruction).GetExecSize(); break;
                 case IC_UNARY:     nExecSize = static_cast<const UnaryInstruction&>(rInstruction).GetExecSize(); break;
-                case IC_TERNARY:   nExecSize = static_cast<const UnaryInstruction&>(rInstruction).GetExecSize(); break;
+                case IC_TERNARY:   nExecSize = static_cast<const TernaryInstruction&>(rInstruction).GetExecSize(); break;
+                case IC_MATH:      nExecSize = static_cast<const MathInstruction&>(rInstruction).GetExecSize(); break;
                 }
-                FormatRegRegion( pBuffer, rSrc.GetDataType(), rSrc.GetRegRegion(), nExecSize );
+               
+                FormatRegRegion( tmp, rSrc.GetDataType(), rSrc.GetRegRegion(), nExecSize );
+            }
+
+            switch( rSrc.GetModifier() )
+            {
+            default:
+            case SM_NONE:
+                strcpy(pBuffer,tmp);
+                break;
+            case SM_ABS:
+                sprintf( pBuffer, "|%s|", tmp );
+                break;
+            case SM_NEGATE:
+                sprintf( pBuffer, "-%s", tmp );
+                break;
+            case SM_NEG_ABS:
+                sprintf( pBuffer, "-|%s|", tmp );
+                break;
             }
         }
+
+        static void FormatFlagReference( char* pBuff, const FlagReference& r )
+        {
+            sprintf( pBuff, "f%u.%u", r.GetReg(), r.GetSubReg() );
+        }
+       
 
         void DisassembleOp( IPrinter& printer, const Instruction& op )
         {
             char Src0[64];
             char Src1[64];
+            char Src2[64];
             char Dst[64];
+            char Op[64];
             switch( op.GetClass() )
             {
             case IC_SEND:
@@ -312,7 +340,33 @@ namespace GEN
 
              case IC_MATH:
                 {
-                    Printf(printer, OPCODE_FORMAT, "Math");
+                    char Dest[64];
+                    char Src0[64];
+                    char Src1[64];
+                    const GEN::MathInstruction& rMath = static_cast<const GEN::MathInstruction&>(op);
+
+                    FormatDest(Dest, rMath.GetDest(), rMath.GetExecSize() );
+                    FormatSource(Src0, rMath.GetSource0(), rMath );
+                    FormatSource(Src1, rMath.GetSource1(), rMath );
+                    const char* pOperation = "?Math?";
+                    switch( rMath.GetFunction() )
+                    {
+                    case MATH_INVERSE: pOperation = "rcp"; break;
+                    case MATH_LOG: pOperation = "log"; break;
+                    case MATH_EXP: pOperation = "exp"; break;
+                    case MATH_SQRT: pOperation = "sqrt"; break;
+                    case MATH_RSQ : pOperation = "rsq"; break;
+                    case MATH_SIN:  pOperation = "sin"; break;
+                    case MATH_COS:  pOperation = "cos"; break;
+                    case MATH_FDIV: pOperation = "fdiv"; break;
+                    case MATH_POW:  pOperation = "pow"; break;
+                    case MATH_IDIV_BOTH: pOperation = "idivmod"; break;
+                    case MATH_IDIV_QUOTIENT: pOperation = "idiv"; break;
+                    case MATH_IDIV_REMAINDER: pOperation = "imod"; break;
+                    }
+
+                    Printf(printer, OPCODE_FORMAT"(%u)""%16s,%16s,%16s", pOperation, rMath.GetExecSize(), Dest, Src0, Src1 );
+                    
                 }
                 break;
 
@@ -327,6 +381,10 @@ namespace GEN
                            rInst.GetExecSize(),
                            Dst,
                            Src0 );
+
+                    if( rInst.GetConditionModifier() != CM_NONE )
+                        Printf( printer, "  cm(%s)", GEN::ConditionalModifierToString(rInst.GetConditionModifier()) );
+                    
                 }
                 break;
 
@@ -337,23 +395,70 @@ namespace GEN
                     FormatSource(Src0,rInst.GetSource0(),rInst);
                     FormatSource(Src1,rInst.GetSource1(),rInst);
 
-                     Printf( printer, OPCODE_FORMAT"(%u)" "%16s,%16s,%16s", 
-                           GEN::OperationToString(op.GetOperation()),
-                           rInst.GetExecSize(),
-                           Dst,
-                           Src0,
-                           Src1 );
+                    if( op.GetOperation() == OP_CMP )
+                    {
+                        // print compares as cmpxxx for brevity
+                        char Flag[64];
+                        FormatFlagReference( Flag, rInst.GetFlagReference() );
+
+                        Printf( printer, OPCODE_FORMAT"%s(%u)(%s)" "%16s,%16s,%16s", 
+                               GEN::OperationToString(op.GetOperation()),
+                               GEN::ConditionalModifierToString(rInst.GetConditionModifier()),
+                               rInst.GetExecSize(),
+                               Flag,
+                               Dst,
+                               Src0,
+                               Src1 );
+                    }
+                    else
+                    {
+                        Printf( printer, OPCODE_FORMAT"(%u)" "%16s,%16s,%16s", 
+                               GEN::OperationToString(op.GetOperation()),
+                               rInst.GetExecSize(),
+                               Dst,
+                               Src0,
+                               Src1 );
+
+                        if( rInst.GetConditionModifier() != CM_NONE )
+                            Printf( printer, "  cm(%s)", GEN::ConditionalModifierToString(rInst.GetConditionModifier()) );
+                    }
                 }
                 break;
 
             case IC_TERNARY:
                 {
-                    Printf( printer, OPCODE_FORMAT, GEN::OperationToString(op.GetOperation()) );
+                    
+                    const GEN::TernaryInstruction& rInst = static_cast<const GEN::TernaryInstruction&>( op );
+                    FormatDest(Dst,rInst.GetDest(), rInst.GetExecSize());
+                    FormatSource(Src0,rInst.GetSource0(),rInst);
+                    FormatSource(Src1,rInst.GetSource1(),rInst);
+                    FormatSource(Src2,rInst.GetSource2(),rInst);
+
+                    
+                    Printf( printer, OPCODE_FORMAT"(%u)" "%16s,%14s,%14s,%14s", 
+                            GEN::OperationToString(op.GetOperation()),
+                            rInst.GetExecSize(),
+                            Dst,
+                            Src0,
+                            Src1,
+                            Src2);
+
                 }
                 break;
             case IC_NULL:
                 {
                     Printf( printer, OPCODE_FORMAT, GEN::OperationToString(op.GetOperation()) );
+                }
+                break;
+            case IC_BRANCH:
+                {
+                    const GEN::BranchInstruction& rBranch = static_cast<const GEN::BranchInstruction&>( op );
+                    Printf( printer, OPCODE_FORMAT"(%u) JIP=%d UIP=%d", 
+                           GEN::OperationToString(op.GetOperation()),
+                           rBranch.GetExecSize(),
+                           rBranch.GetJIP(),
+                           rBranch.GetUIP() );
+                
                 }
                 break;
             }
