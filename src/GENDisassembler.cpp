@@ -240,6 +240,40 @@ namespace GEN
             sprintf( pBuff, "f%u.%u", r.GetReg(), r.GetSubReg() );
         }
        
+        static void FormatPredicate( char* pBuff, const Predicate& p, const FlagReference& flag )
+        {
+            if( p.GetMode() == PM_NONE )
+            {
+                *pBuff=0;
+                return;
+            }
+           
+            if( p.IsInverted() )
+                *(pBuff++) = '~';
+            
+            FormatFlagReference( pBuff, flag );
+            
+            switch( p.GetMode() )
+            {
+            case PM_SEQUENTIAL_FLAG: strcat(pBuff,".seq"); break;
+            case PM_SWIZZLE_X:       strcat(pBuff,".x"); break;
+            case PM_SWIZZLE_Y:       strcat(pBuff,".y"); break;
+            case PM_SWIZZLE_Z:       strcat(pBuff,".z"); break;
+            case PM_SWIZZLE_W:       strcat(pBuff,".w"); break;
+            case PM_ANY4H:           strcat(pBuff,".any4h"); break;
+            case PM_ALL4H:           strcat(pBuff,".all4h"); break;
+            case PM_ANYV     :       strcat(pBuff,".anyv"); break;
+            case PM_ALLV     :       strcat(pBuff,".allv"); break;
+            case PM_ANY2H    :       strcat(pBuff,".any2h"); break;
+            case PM_ALL2H    :       strcat(pBuff,".all2h"); break;
+            case PM_ANY8H    :       strcat(pBuff,".any8h"); break;
+            case PM_ALL8H    :       strcat(pBuff,".all8h"); break;
+            case PM_ANY16H   :       strcat(pBuff,".any16h"); break;
+            case PM_ALL16H   :       strcat(pBuff,".all16h"); break;
+            case PM_ANY32H   :       strcat(pBuff,".any32h"); break;
+            case PM_ALL32H   :       strcat(pBuff,".all32h"); break;
+            }
+        }
 
         void DisassembleOp( IPrinter& printer, const Instruction& op )
         {
@@ -453,11 +487,16 @@ namespace GEN
             case IC_BRANCH:
                 {
                     const GEN::BranchInstruction& rBranch = static_cast<const GEN::BranchInstruction&>( op );
-                    Printf( printer, OPCODE_FORMAT"(%u) JIP=%d UIP=%d", 
+
+                    char Pred[64];
+                    FormatPredicate(Pred,rBranch.GetPredicate(), rBranch.GetFlagReference() );
+
+                    Printf( printer, OPCODE_FORMAT"(%u) JIP=%d UIP=%d  PRED=%s", 
                            GEN::OperationToString(op.GetOperation()),
                            rBranch.GetExecSize(),
                            rBranch.GetJIP(),
-                           rBranch.GetUIP() );
+                           rBranch.GetUIP(),
+                           Pred );
                 
                 }
                 break;

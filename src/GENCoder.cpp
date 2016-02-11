@@ -40,7 +40,7 @@ namespace GEN
         #define ENUM(Enum,Value) { Enum, Value },
         #define END_TRANSLATOR(T,Name,TInvalid) \
             };\
-            T Decode_##Name( size_t en ) {\
+            T DECODE_##Name( size_t en ) {\
                 const EnumLUT* pLUT = LUT_##T_##Name;\
                 size_t n = sizeof(LUT_##T_##Name);\
                 return (T) LUTLookup(pLUT,n,en,TInvalid);\
@@ -286,8 +286,35 @@ namespace GEN
             ENUM( CM_UNORDERED       ,0x09 )
         END_TRANSLATOR(ConditionalModifiers,CondModifiers,MATH_INVALID)
 
+           
+        BEGIN_TRANSLATOR(PredicationModes,PredModesAlign16)
+            ENUM( PM_NONE,              0 )
+            ENUM( PM_SEQUENTIAL_FLAG,   1 )
+            ENUM( PM_SWIZZLE_X,         2 )
+            ENUM( PM_SWIZZLE_Y,         3 )
+            ENUM( PM_SWIZZLE_Z,         4 )
+            ENUM( PM_SWIZZLE_W,         5 )
+            ENUM( PM_ANY4H,             6 )
+            ENUM( PM_ALL4H,             7 )
+        END_TRANSLATOR(PredicationModes,PredModesAlign16,PM_NONE)
 
 
+        BEGIN_TRANSLATOR(PredicationModes,PredModesAlign1)
+            ENUM( PM_NONE,              0 )
+            ENUM( PM_SEQUENTIAL_FLAG,   1 )
+            ENUM( PM_ANYV,              2 )
+            ENUM( PM_ALLV,              3 )
+            ENUM( PM_ANY2H,             4 )
+            ENUM( PM_ALL2H,             5 )
+            ENUM( PM_ANY4H,             6 )
+            ENUM( PM_ALL4H,             7 )
+            ENUM( PM_ANY8H,             8 )
+            ENUM( PM_ALL8H,             9 )
+            ENUM( PM_ANY16H,            10 )
+            ENUM( PM_ALL16H,            11 )
+            ENUM( PM_ANY32H,            12 )
+            ENUM( PM_ALL32H,            13 )
+        END_TRANSLATOR(PredicationModes,PredModesAlign1,PM_NONE)
 
 
         int SignExtend( DWORD dw, DWORD bit )
@@ -604,6 +631,7 @@ namespace GEN
     
         struct InstructionFields
         {
+            DWORD bAlign16;
             DWORD dwOpcode          ;
             DWORD bMaskControl      ;
             DWORD bNoDDChk;
@@ -632,7 +660,7 @@ namespace GEN
         
         void FillFlagFields( InstructionFields& rFields, const GEN::FlagReference& rFlags )
         {
-            rFields.dwFlagRegNum = rFlags.GetReg();
+            rFields.dwFlagRegNum    = rFlags.GetReg();
             rFields.dwFlagSubRegNum = rFlags.GetSubReg();
         }
 
@@ -694,6 +722,7 @@ namespace GEN
             FillRegFields(reg,rOperand.GetRegRegion(), rOperand.GetDataType() );
         }
      
+    
         
         void WriteSourceRegFields( uint8* pLoc, const RegisterFields& reg, bool bAlign1 )
         {
@@ -822,20 +851,41 @@ namespace GEN
 
         }
        
+        static void DecodeRegNumAndType( RegisterFields& reg )
+        {
+            switch( reg.dwRegFile )
+            {
+            case RF_GRF:
+                reg.dwDataType = DECODE_RegDataTypes(reg.dwDataType);
+                break;
+            case RF_ARF:
+                reg.dwDataType = DECODE_RegDataTypes(reg.dwDataType);
+                reg.dwRegNum   = DECODE_ArchRegisters(reg.dwRegNum);
+                break;
+            case RF_IMM:
+                reg.dwDataType = DECODE_ImmDataTypes(reg.dwDataType);
+                break;
+            }
+        }
 
-
+        static void DecodePredicationMode( InstructionFields& fields )
+        {
+            if( fields.bAlign16 )
+                fields.nPredControl = DECODE_PredModesAlign16(fields.nPredControl);
+            else
+                fields.nPredControl = DECODE_PredModesAlign1(fields.nPredControl);
+        }
       
         void ReadSourceRegFields( RegisterFields& reg, const uint8* pIn, bool align1 )
         {
             reg.bIsIndirect = ReadBit(pIn,15);
             reg.dwModifier  = ReadBits(pIn,14,13);
-            reg.dwVStride   = ReadBits(pIn,24,21);
-            
+            reg.dwVStride   = DECODE_VStride( ReadBits(pIn,24,21) );
             if( align1 )
             {
                 reg.dwChanSel = 0xE4; // default swizzles:   3 2 1 0 -> 11 10 01 00
-                reg.dwWidth   = ReadBits(pIn,20,18);
-                reg.dwHStride = ReadBits(pIn,17,16);
+                reg.dwWidth   = DECODE_Width( ReadBits(pIn,20,18) );
+                reg.dwHStride = DECODE_HStride( ReadBits(pIn,17,16) );
                 if( reg.bIsIndirect )
                 {
                     reg.nAddrImm = SignExtend( ReadBits(pIn,9,0), 9 );
@@ -849,8 +899,8 @@ namespace GEN
             }
             else
             {
-                reg.dwWidth     = Encode_Width(4); 
-                reg.dwHStride   = Encode_HStride(1);
+                reg.dwWidth     = 4;
+                reg.dwHStride   = 1;
                 reg.dwChanSel   = ReadBits(pIn,3,0)|ReadBits(pIn,19,16)<<4;
                 if( reg.bIsIndirect )
                 {
@@ -863,13 +913,17 @@ namespace GEN
                     reg.dwSubRegNum = ReadBit(pIn,4)<<4;
                 }
             }
+
+            DecodeRegNumAndType(reg);
         }
+
+       
 
         void ReadInstructionFields ( InstructionFields& fields, const uint8* pIn )
         {
             memset(&fields,0,sizeof(fields));
-            DWORD bAlign16 = ReadBits(pIn,8,8);
-            fields.dwOpcode              = ReadBits(pIn,7,0);
+            fields.bAlign16 = ReadBits(pIn,8,8);
+            fields.dwOpcode              = DECODE_Operations(ReadBits(pIn,7,0));
             fields.bMaskControl          = ReadBits(pIn,9,9);
             fields.bNoDDChk              = ReadBit(pIn,11);
             fields.bNoDDClr              = ReadBit(pIn,10);
@@ -891,13 +945,14 @@ namespace GEN
 
             fields.dwNibControl          = ReadBit( pIn,47 );
             fields.Dest.bIsIndirect      = ReadBit( pIn,63 );
-            bool align1 = bAlign16 == 0;
+            bool align1 = fields.bAlign16 == 0;
+            
 
             // Decode destination register
             if( align1 )
             {
                 fields.dwDestWriteMask = 0xffff;
-                fields.Dest.dwHStride = ReadBits( pIn, 62,61);
+                fields.Dest.dwHStride = DECODE_HStride(ReadBits( pIn, 62,61));
                 if( fields.Dest.bIsIndirect )
                 {
                     fields.Dest.nAddrImm  = SignExtend( ReadBits(pIn,25,16), 9 );
@@ -911,7 +966,7 @@ namespace GEN
             }
             else
             {
-                fields.Dest.dwHStride = Encode_HStride(1);
+                fields.Dest.dwHStride = 1;
                 fields.dwDestWriteMask = ReadBits(pIn,51,48);
                 if( fields.Dest.bIsIndirect )
                 {
@@ -924,25 +979,44 @@ namespace GEN
                     fields.Dest.dwSubRegNum = ReadBit(pIn,52)<<4;
                 }
             }
-
-            // dest width/stride follows from exec size 
-            fields.Dest.dwWidth   = fields.nExecSize;
-            fields.Dest.dwVStride = Encode_VStride(Decode_Width(fields.Dest.dwWidth)*Decode_HStride(fields.Dest.dwHStride));
-        
+            
+            DecodeRegNumAndType(fields.Dest);
 
             ReadSourceRegFields(fields.Src0,pIn+8, align1);
             ReadSourceRegFields(fields.Src1,pIn+12, align1);
 
             memcpy( &fields.IMM64, pIn+8,8);
             memcpy( &fields.IMM32, pIn+12,4);
-
-            fields.Dest.bAlign16 = bAlign16;
-            fields.Src0.bAlign16 = bAlign16;
-            fields.Src1.bAlign16 = bAlign16;
-            fields.Src2.bAlign16 = bAlign16;
-
+            
             fields.dwFlagRegNum    = ReadBit(pIn,90);
             fields.dwFlagSubRegNum = ReadBit(pIn,89);
+
+            // Translate field values, and compute derived fields
+            fields.nExecSize = DECODE_ExecSize(fields.nExecSize);
+            DecodePredicationMode(fields);
+
+            switch( fields.dwOpcode )
+            {
+            case OP_MATH:
+                fields.nCondModifier = DECODE_MathFunctions(fields.nCondModifier);
+                break;
+            case OP_SEND:
+                fields.nCondModifier = DECODE_SharedFunctions(fields.nCondModifier);
+                break;
+            default:
+                fields.nCondModifier = DECODE_CondModifiers(fields.nCondModifier);
+                break;
+            }
+         
+            // dest width/stride follows from exec size 
+            fields.Dest.dwWidth   = fields.nExecSize;
+            fields.Dest.dwVStride = fields.Dest.dwWidth*fields.Dest.dwHStride;
+           
+            fields.Dest.bAlign16 = fields.bAlign16;
+            fields.Src0.bAlign16 = fields.bAlign16;
+            fields.Src1.bAlign16 = fields.bAlign16;
+            fields.Src2.bAlign16 = fields.bAlign16;
+
         }
 
         void ReadInstructionFieldsThreeSrc( InstructionFields& fields, const unsigned char* pIn )
@@ -952,6 +1026,7 @@ namespace GEN
             fields.Src1.bAlign16 = true;
             fields.Src2.bAlign16 = true;
             fields.Dest.bAlign16 = true;
+            fields.bAlign16 = true;
             fields.dwOpcode              = ReadBits(pIn,7,0);
             fields.bMaskControl          = ReadBits(pIn,9,9);
             fields.bNoDDChk              = ReadBit(pIn,11);
@@ -980,7 +1055,7 @@ namespace GEN
 
             fields.dwDestWriteMask = ReadBits(pIn,52,49);
   
-            fields.Dest.dwRegFile   = RF_GRF;
+            fields.Dest.dwRegFile = RF_GRF;
             fields.Src0.dwRegFile = RF_GRF;
             fields.Src1.dwRegFile = RF_GRF;
             fields.Src2.dwRegFile = RF_GRF;
@@ -1000,33 +1075,38 @@ namespace GEN
             fields.Src2.dwSubRegNum     = ReadBits(pIn,117,115)<<2;
             fields.Src2.dwRegNum        = ReadBits(pIn,125,118);
 
-            fields.Src0.dwVStride = Encode_VStride(8);
-            fields.Src1.dwVStride = Encode_VStride(8);
-            fields.Src2.dwVStride = Encode_VStride(8);
-            fields.Src0.dwWidth   = Encode_Width(8);
-            fields.Src1.dwWidth   = Encode_Width(8);
-            fields.Src2.dwWidth   = Encode_Width(8);
+            fields.Src0.dwVStride = 8;
+            fields.Src1.dwVStride = 8;
+            fields.Src2.dwVStride = 8;
+            fields.Src0.dwWidth   = 8;
+            fields.Src1.dwWidth   = 8;
+            fields.Src2.dwWidth   = 8;
             fields.Src0.dwHStride = 1;
             fields.Src1.dwHStride = 1;
             fields.Src2.dwHStride = 1;
             fields.Dest.dwHStride = 1;
-            fields.Dest.dwVStride = Encode_VStride(8);
-            fields.Dest.dwWidth = Encode_Width(8);
+            fields.Dest.dwVStride = 8;
+            fields.Dest.dwWidth   = 8;
 
-
+            fields.nExecSize = DECODE_ExecSize(fields.nExecSize);
+            DecodeRegNumAndType(fields.Dest);
+            DecodeRegNumAndType(fields.Src0);
+            DecodeRegNumAndType(fields.Src1);
+            DecodeRegNumAndType(fields.Src2);
+            DecodePredicationMode(fields);
         }
       
 
 
         GEN::RegisterRegion InterpretRegisterRegion( RegisterFields& reg )
         {
-            DWORD dwWidth   = Decode_Width( reg.dwWidth );
-            DWORD dwHStride = Decode_HStride( reg.dwHStride );
-            DWORD dwVStride = Decode_VStride( reg.dwVStride );
+            DWORD dwWidth   = reg.dwWidth ;
+            DWORD dwHStride = reg.dwHStride;
+            DWORD dwVStride = reg.dwVStride;
 
             if( reg.dwRegFile == RF_ARF )
             {
-                RegTypes eRegType = Decode_ArchRegisters(reg.dwRegNum);
+                RegTypes eRegType = (RegTypes)(reg.dwRegNum);
                 return GEN::RegisterRegion( GEN::DirectRegReference( eRegType, 0, reg.dwSubRegNum ), 
                                             dwVStride, dwWidth, dwHStride );
             }
@@ -1051,19 +1131,19 @@ namespace GEN
             SourceModifiers eMod = (SourceModifiers) rReg.dwModifier;
             if( rReg.dwRegFile == RF_IMM )
             {
-                DataTypes eDataType = Decode_ImmDataTypes( rReg.dwDataType );
+                DataTypes eDataType = (DataTypes) rReg.dwDataType ;
                 return GEN::SourceOperand(eDataType, eMod);
             }
             else
             {
-                DataTypes eDataType = Decode_RegDataTypes( rReg.dwDataType );
+                DataTypes eDataType = (DataTypes) rReg.dwDataType ;
                 return GEN::SourceOperand(eDataType,InterpretRegisterRegion(rReg), eMod);
             }
         }
 
         GEN::DestOperand InterpretDest( InstructionFields& rInstruction )
         {
-            DataTypes eDataType = Decode_RegDataTypes( rInstruction.Dest.dwDataType );
+            DataTypes eDataType = (DataTypes) rInstruction.Dest.dwDataType ;
             return GEN::DestOperand(eDataType,InterpretRegisterRegion(rInstruction.Dest), rInstruction.dwDestWriteMask);
         }
 
@@ -1079,14 +1159,14 @@ namespace GEN
 
     Operations Decoder::GetOperation( const uint8* pInstructionBytes )
     {
-        return _INTERNAL::Decode_Operations(_INTERNAL::ReadDWORD( pInstructionBytes ) & _INTERNAL::OPCODE_MASK);
+        return _INTERNAL::DECODE_Operations(_INTERNAL::ReadDWORD( pInstructionBytes ) & _INTERNAL::OPCODE_MASK);
     }
 
    
     size_t Decoder::DetermineLength( const uint8* pInstructionBytes )
     {
         uint32 nDWORD = _INTERNAL::ReadDWORD( pInstructionBytes );
-        Operations eOp = _INTERNAL::Decode_Operations(nDWORD & _INTERNAL::OPCODE_MASK);
+        Operations eOp = _INTERNAL::DECODE_Operations(nDWORD & _INTERNAL::OPCODE_MASK);
         switch( eOp )
         {
         case NOT_AN_OP:
@@ -1121,7 +1201,7 @@ namespace GEN
     {
         uint32 nDWORD  = _INTERNAL::ReadDWORD( pInput );
         uint32 nOpcode = nDWORD & _INTERNAL::OPCODE_MASK;
-        Operations eOp = _INTERNAL::Decode_Operations(nOpcode);
+        Operations eOp = _INTERNAL::DECODE_Operations(nOpcode);
      
         switch( eOp )
         {
@@ -1173,7 +1253,7 @@ namespace GEN
     {
         uint32 nDWORD  = _INTERNAL::ReadDWORD( pInstructionBytes );
         uint32 nOpcode = nDWORD & _INTERNAL::OPCODE_MASK;
-        Operations eOp = _INTERNAL::Decode_Operations(nOpcode);
+        Operations eOp = _INTERNAL::DECODE_Operations(nOpcode);
                 
         memset(pInst,0,sizeof(Instruction));
         pInst->m_eClass = IC_NULL;
@@ -1253,14 +1333,15 @@ namespace GEN
         _INTERNAL::InstructionFields fields;
         _INTERNAL::ReadInstructionFieldsThreeSrc( fields, pIn );
 
-        pInst->m_nExecSize    = _INTERNAL::Decode_ExecSize(fields.nExecSize);
+        pInst->m_nExecSize    = fields.nExecSize;
         pInst->m_bNoWriteMask = fields.bMaskControl;
         pInst->m_bNoDDChk     = fields.bNoDDChk;
         pInst->m_Dest         = _INTERNAL::InterpretDest( fields );
         pInst->m_Source0      = _INTERNAL::InterpretSource(fields.Src0);
         pInst->m_Source1      = _INTERNAL::InterpretSource(fields.Src1);
         pInst->m_Source2      = _INTERNAL::InterpretSource(fields.Src2);
-
+        pInst->m_Predicate.Set( (PredicationModes) fields.nPredControl, fields.bPredInvert );
+        
         return 16;
     }
 
@@ -1270,10 +1351,11 @@ namespace GEN
         _INTERNAL::ReadInstructionFields( fields, pInstructionBytes );
 
         pInst->m_eOp          = eOp;
-        pInst->m_nExecSize    = _INTERNAL::Decode_ExecSize(fields.nExecSize);
+        pInst->m_nExecSize    = fields.nExecSize;
         pInst->m_bNoWriteMask = fields.bMaskControl;
         pInst->m_bNoDDChk     = fields.bNoDDChk;
-
+        pInst->m_Predicate.Set( (PredicationModes) fields.nPredControl, fields.bPredInvert );
+        
         if( eOp == OP_DIM )
             memcpy( pInst->m_ImmediateOperand, &fields.IMM64, 8 );
         else
@@ -1307,8 +1389,8 @@ namespace GEN
                 pInst->m_eClass  = IC_UNARY;
                 pInst->m_Dest    = _INTERNAL::InterpretDest(fields);
                 pInst->m_Source0 = _INTERNAL::InterpretSource(fields.Src0);
-                pInst->m_eCondModifier = _INTERNAL::Decode_CondModifiers(fields.nCondModifier);
-                pInst->m_Flags          = _INTERNAL::InterpretFlagReference(fields);
+                pInst->m_eCondModifier = fields.nCondModifier;
+                pInst->m_Flags         = _INTERNAL::InterpretFlagReference(fields);
                 return pInst->m_Dest.IsValid() && pInst->m_Source0.IsValid();
             }
             break;
@@ -1345,7 +1427,7 @@ namespace GEN
                 pInst->m_Dest           = _INTERNAL::InterpretDest(fields);
                 pInst->m_Source0        = _INTERNAL::InterpretSource(fields.Src0);
                 pInst->m_Source1        = _INTERNAL::InterpretSource(fields.Src1);
-                pInst->m_eCondModifier  = _INTERNAL::Decode_CondModifiers(fields.nCondModifier);
+                pInst->m_eCondModifier  = fields.nCondModifier;
                 pInst->m_Flags          = _INTERNAL::InterpretFlagReference(fields);
                 return pInst->m_Dest.IsValid() && pInst->m_Source0.IsValid() && pInst->m_Source1.IsValid();
             }
@@ -1412,10 +1494,12 @@ namespace GEN
         pInst->m_bMsgDescriptorFromReg = bMsgDescriptorFromReg;
         pInst->m_Dest           = _INTERNAL::InterpretDest(fields);
         pInst->m_Source0        = _INTERNAL::InterpretSource(fields.Src0);
-        pInst->m_eSFID          = _INTERNAL::Decode_SharedFunctions(fields.nCondModifier);
-        pInst->m_nExecSize      = _INTERNAL::Decode_ExecSize(fields.nExecSize);
+        pInst->m_eSFID          = fields.nCondModifier;
+        pInst->m_nExecSize      = fields.nExecSize;
         pInst->m_bNoWriteMask   = fields.bMaskControl;
         pInst->m_bEOT           = bEOT;
+        pInst->m_Predicate.Set( (PredicationModes) fields.nPredControl, fields.bPredInvert );
+        
         return 16;
     }
 
@@ -1428,11 +1512,12 @@ namespace GEN
         _INTERNAL::InstructionFields fields;
         _INTERNAL::ReadInstructionFields(fields,pInstructionBytes);
 
-        pInst->m_eFunctionCtrl  = _INTERNAL::Decode_MathFunctions( fields.nCondModifier );
+        pInst->m_eFunctionCtrl  = fields.nCondModifier;
         pInst->m_Dest           = _INTERNAL::InterpretDest(fields);
         pInst->m_Source0        = _INTERNAL::InterpretSource(fields.Src0);
-        pInst->m_nExecSize      = _INTERNAL::Decode_ExecSize(fields.nExecSize);
+        pInst->m_nExecSize      = fields.nExecSize;
         pInst->m_bNoWriteMask   = fields.bMaskControl;
+        pInst->m_Predicate.Set( (PredicationModes) fields.nPredControl, fields.bPredInvert );
         
         return 16;
     }

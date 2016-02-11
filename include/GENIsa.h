@@ -244,6 +244,30 @@ namespace GEN
         SFID_INVALID
     };
 
+    enum PredicationModes : uint8
+    {
+        PM_NONE,
+        PM_SEQUENTIAL_FLAG, 
+        PM_SWIZZLE_X,       // swizzle modes are align16 only
+        PM_SWIZZLE_Y,
+        PM_SWIZZLE_Z,
+        PM_SWIZZLE_W, 
+        PM_ANY4H,
+        PM_ALL4H,
+
+        // modes below are align1 only
+        PM_ANYV,
+        PM_ALLV,
+        PM_ANY2H,
+        PM_ALL2H,
+        PM_ANY8H,
+        PM_ALL8H,
+        PM_ANY16H,
+        PM_ALL16H,
+        PM_ANY32H,
+        PM_ALL32H,
+
+    };
  
 
     enum InstructionClass : uint8
@@ -266,6 +290,24 @@ namespace GEN
         unsigned y : 2;
         unsigned z : 2;
         unsigned w : 2;
+    };
+
+    class Predicate
+    {
+    public:
+        Predicate() : m_eMode(PM_NONE), m_bInvert(0){}
+
+        void Set( PredicationModes eMode, bool bInvert )
+        {
+            m_eMode   = eMode;
+            m_bInvert = bInvert;
+        }
+        PredicationModes GetMode() const { return (PredicationModes)m_eMode; }
+        bool IsInverted() const { return m_bInvert; }
+
+    private:
+        unsigned m_eMode : 7;
+        unsigned m_bInvert : 1;
     };
 
     class FlagReference
@@ -467,8 +509,11 @@ namespace GEN
     class Instruction
     {
     public:
-        Instruction() : m_eClass(IC_NULL), m_eOp(OP_ILLEGAL), m_bEOT(0), m_bNoDDChk(0), m_bMsgDescriptorFromReg(0){}
+        Instruction() 
+            : m_eClass(IC_NULL), m_eOp(OP_ILLEGAL), m_bEOT(0), m_bNoDDChk(0), m_bMsgDescriptorFromReg(0)
+        {}
 
+        Predicate GetPredicate() const { return m_Predicate; }
         InstructionClass GetClass() const { return (InstructionClass)m_eClass; };
         Operations GetOperation() const { return (Operations)m_eOp; }
 
@@ -478,6 +523,9 @@ namespace GEN
 
         bool IsDDCheckDisabled() const { return m_bNoDDChk; }
         void DisableDDCheck() { m_bNoDDChk = 1; };
+
+        FlagReference GetFlagReference() const { return m_Flags; }
+        void SetFlagReference( const FlagReference& rFlag ) { m_Flags = rFlag; }
 
     protected:
         Instruction( InstructionClass e ) 
@@ -497,12 +545,15 @@ namespace GEN
         uint8 m_nExecSize;
         unsigned m_bNoWriteMask : 1;
         unsigned m_bNoDDChk : 1;
+        Predicate m_Predicate;
 
         /////////////////////////////////////
         // Send instruction only
         unsigned m_bEOT : 1;
         unsigned m_bMsgDescriptorFromReg : 1;
         ////////////////////////////////////
+
+
 
         union
         {
@@ -601,8 +652,7 @@ namespace GEN
         const SourceOperand& GetSource0() const { return m_Source0; };
         const SourceOperand& GetSource1() const { return m_Source1; };
     
-        FlagReference GetFlagReference() const { return m_Flags; }
-        void SetFlagReference( const FlagReference& rFlag ) { m_Flags = rFlag; }
+
     };
 
     class TernaryInstruction : public Instruction
