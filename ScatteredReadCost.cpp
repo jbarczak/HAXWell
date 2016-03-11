@@ -28,7 +28,7 @@ static void ConstructShader( std::vector<GEN::Instruction>& ops, size_t nThreads
         GEN::BinaryInstruction( 1, GEN::OP_MUL,
             GEN::DestOperand( GEN::DT_U32, GEN::RegisterRegion( GEN::DirectRegReference(GEN::REG_GPR,4,8),1,1,1 ) ),
             GEN::SourceOperand( GEN::DT_U32, GEN::RegisterRegion( GEN::DirectRegReference(GEN::REG_GPR,0,4),1,1,1) ),
-            GEN::SourceOperand( GEN::DT_U32 ), nThreadsPerGroup*2
+            GEN::SourceOperand( GEN::DT_U32 , nThreadsPerGroup*2 )
             )
     );
     // copy EOT payload

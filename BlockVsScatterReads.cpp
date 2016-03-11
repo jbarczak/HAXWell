@@ -9,14 +9,14 @@
 
 #include "Misc.h"
 
-#define FILENAME "block_sa.csv"
+
+
+#define FILENAME "Scattervsgather.csv"
 #define REPEAT_COUNT 32
-//#define READ_INVALIDATE
 #define SAME_ADDRESS
 
-static void ConstructShader( std::vector<GEN::Instruction>& ops, size_t nComputes, size_t nThreadsPerGroup )
+static void ConstructShader( std::vector<GEN::Instruction>& ops, size_t nThreadsPerGroup, bool bBlockReads )
 {
-
     // write address is threadgroup_id*threads_per_group*2 + 2*local_thread_id 
     //  
     ops.push_back( 
@@ -28,7 +28,7 @@ static void ConstructShader( std::vector<GEN::Instruction>& ops, size_t nCompute
         GEN::BinaryInstruction( 1, GEN::OP_MUL,
             GEN::DestOperand( GEN::DT_U32, GEN::RegisterRegion( GEN::DirectRegReference(GEN::REG_GPR,4,8),1,1,1 ) ),
             GEN::SourceOperand( GEN::DT_U32, GEN::RegisterRegion( GEN::DirectRegReference(GEN::REG_GPR,0,4),1,1,1) ),
-            GEN::SourceOperand( GEN::DT_U32, nThreadsPerGroup*2 )
+            GEN::SourceOperand( GEN::DT_U32 , nThreadsPerGroup*2 )
             )
     );
     // copy EOT payload
@@ -49,29 +49,12 @@ static void ConstructShader( std::vector<GEN::Instruction>& ops, size_t nCompute
    
 
 
-
-
-    // build read address.    Start with the write address we're using for timestamps
-    ops.push_back( 
-        GEN::RegMove( GEN::REG_GPR, 9, GEN::REG_GPR, 4 )
-    );
-
-    // our base address is in 32-byte units.  Convert this to cachelines
-    ops.push_back( 
-        GEN::BinaryInstruction( 1, GEN::OP_MUL,
-            GEN::DestOperand( GEN::DT_U32, GEN::RegisterRegion( GEN::DirectRegReference(GEN::REG_GPR,9,8),1,1,1 ) ),
-            GEN::SourceOperand( GEN::DT_U32, GEN::RegisterRegion( GEN::DirectRegReference(GEN::REG_GPR,9,8),1,1,1) ),
-            GEN::SourceOperand( GEN::DT_U32 , 2 )
-        )
-    );
-
 #ifdef SAME_ADDRESS
     ops.push_back( 
         GEN::RegMoveIMM( 9, 0 )
     );
 #endif
 
-    
     // read timestamp register
     ops.push_back( 
          GEN::UnaryInstruction( 2, GEN::OP_MOV,
@@ -83,43 +66,36 @@ static void ConstructShader( std::vector<GEN::Instruction>& ops, size_t nCompute
     ///////////////////////////////////////////////////
     
    
-       
-    for( size_t i=0; i<REPEAT_COUNT; i++ )
+    if( bBlockReads )
     {
-        // send read message
-        size_t nReg=10;
-
-#ifdef READ_INVALIDATE
-        ops.push_back( 
-            GEN::OWordDualBlockReadAndInvalidate( HAXWell::BIND_TABLE_BASE+1, 9, nReg )
-            );
-#else
-        ops.push_back( 
-            GEN::OWordDualBlockRead( HAXWell::BIND_TABLE_BASE+1, 9, nReg )
-        );
-#endif
-
-
-        // do some intervening math
-        for( size_t j=0; j<nComputes; j++ )
+        for( size_t i=0; i<REPEAT_COUNT; i++ )
         {
+           ops.push_back( 
+               GEN::OWordDualBlockRead( HAXWell::BIND_TABLE_BASE + 1, 3, 2 )
+               );
+
+            // use the read result
             ops.push_back(
-                GEN::BinaryInstruction(
-                    8, GEN::OP_ADD, 
-                    GEN::DestOperand( GEN::DT_U32, GEN::RegisterRegion( GEN::DirectRegReference( GEN::REG_GPR,nReg+1,0),8,8,1)),
-                    GEN::SourceOperand( GEN::DT_U32, GEN::RegisterRegion( GEN::DirectRegReference( GEN::REG_GPR,nReg+1,0),8,8,1)),
-                    GEN::SourceOperand( GEN::DT_U32, GEN::RegisterRegion( GEN::DirectRegReference( GEN::REG_GPR,nReg+1,0),8,8,1))
-                    )
+                GEN::RegMove(GEN::REG_GPR,7,GEN::REG_GPR,2)
             );
-        }
-
-        // use the read result
-        ops.push_back(
-            GEN::RegMove(GEN::REG_GPR,nReg+1,GEN::REG_GPR,nReg)
-        );
         
+        }
     }
+    else
+    {
+        for( size_t i=0; i<REPEAT_COUNT; i++ )
+        {
+           ops.push_back( 
+               GEN::DWordScatteredReadSIMD8( HAXWell::BIND_TABLE_BASE + 1, 2, 3 )
+               );
 
+            // use the read result
+            ops.push_back(
+                GEN::RegMove(GEN::REG_GPR,7,GEN::REG_GPR,3)
+            );
+        
+        }
+    }
 
     ///////////////////////////////////////////////////
     
@@ -162,12 +138,12 @@ static void ConstructShader( std::vector<GEN::Instruction>& ops, size_t nCompute
 
 
 
-double BlockReadTest( size_t nComputation )
+double DoTest( bool bBlockReads )
 {
     size_t nGroups = 32;
     size_t nThreadsPerGroup=60;
     std::vector<GEN::Instruction> ops;
-    ConstructShader(ops,nComputation, nThreadsPerGroup);
+    ConstructShader(ops,nThreadsPerGroup, bBlockReads );
 
     GEN::Encoder enc;
     HAXWell::Blob isa;
@@ -176,16 +152,29 @@ double BlockReadTest( size_t nComputation )
 
     //PrintISA(stdout,isa);
 
-    int CURBE[HAXWell::MAX_DISPATCH_COUNT][8];
+    int CURBE[HAXWell::MAX_DISPATCH_COUNT][3][8];
     for( size_t i=0; i<HAXWell::MAX_DISPATCH_COUNT; i++ )
+    {
+        // first CURBE reg is offset into timings buffer
         for( size_t j=0; j<8; j++ )
-            CURBE[i][j] = 2*i;
+            CURBE[i][0][j] = 2*i;
+
+        // second CURBE reg is per-channel read offsets for scatter read
+        for( size_t j=0; j<8; j++ )
+            CURBE[i][1][j] = 8*i + j;
+
+        // third CURBE reg per-thread base address for block reads
+        // note that blcok read offset goes in second dword of register
+        for( size_t j=0; j<8; j++ )
+            CURBE[i][2][j] = 0;
+        CURBE[i][2][2] = 2*i;
+    }
 
 
     HAXWell::ShaderArgs args;
     args.nDispatchThreadCount = nThreadsPerGroup;
     args.nSIMDMode = 16;
-    args.nCURBEAllocsPerThread = 1;
+    args.nCURBEAllocsPerThread = 3;
     args.pCURBE = CURBE;
     args.nIsaLength = isa.GetLength();
     args.pIsa = isa.GetBytes();
@@ -225,18 +214,19 @@ double BlockReadTest( size_t nComputation )
 
 
 
-void BlockReadTest()
+void ScatterVsGather()
 {
-    FILE* fp = fopen(FILENAME, "w" );
-    fprintf(fp, "compute operations, mean shader latency\n");
-    for( size_t i=1; i<32; i++ )
-    {
-        double tm;
-        tm  = BlockReadTest(i);
-        tm += BlockReadTest(i);
-        tm += BlockReadTest(i);
-        fprintf(fp, "%u,%f\n", i,tm/3 );
-    }
+   
+    double avg_block = 0;
+    double avg_scat = 0;
     
-    fclose(fp);
+    for( size_t i=0; i<5; i++ )
+    {
+        avg_block += DoTest( false );
+        avg_scat += DoTest( true );
+    }
+
+    printf(" block %.2f\nscat: %.2f\n", avg_block/5, avg_scat/5 );
+
+    
 }

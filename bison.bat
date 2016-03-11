@@ -1,0 +1,1 @@
+winflexbison\win_bison --report-file=bison_out -d -o src\autogen\GENAssembler_Bison.cpp src\GENAssembler_Bison.y

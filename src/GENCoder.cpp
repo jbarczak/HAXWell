@@ -664,6 +664,15 @@ namespace GEN
             rFields.dwFlagSubRegNum = rFlags.GetSubReg();
         }
 
+        void FillPredicationFields( InstructionFields& rFields, const GEN::Predicate& rPred )
+        {
+            rFields.bPredInvert = rPred.IsInverted();
+            if( rFields.bAlign16 )
+                rFields.nPredControl = Encode_PredModesAlign16( rPred.GetMode() );
+            else
+                rFields.nPredControl = Encode_PredModesAlign1( rPred.GetMode() );
+        }
+
 
         void FillRegFields( RegisterFields& reg,  const GEN::RegisterRegion& rRegion, DataTypes eType )
         {
@@ -681,7 +690,7 @@ namespace GEN
                 reg.dwSubRegNum = rDirect.GetSubRegOffset();
               
                 if( rReg.GetRegType() == REG_GPR )
-                    reg.dwRegFile = RF_GRF;
+                    reg.dwRegFile = RF_GRF; 
                 else
                 {
                     reg.dwRegNum = Encode_ArchRegisters( rReg.GetRegType() );
@@ -727,7 +736,7 @@ namespace GEN
         void WriteSourceRegFields( uint8* pLoc, const RegisterFields& reg, bool bAlign1 )
         {
             WriteBit( pLoc, reg.bIsIndirect, 15 );
-            // TODO modifiers
+            WriteBits( pLoc, reg.dwModifier, 14,13 );
             WriteBits( pLoc, reg.dwVStride, 24,21 );
 
             if( bAlign1 )
@@ -772,6 +781,10 @@ namespace GEN
 
             WriteBits( pLoc, rFields.dwOpcode, 6,0);
             WriteBits( pLoc, bAlign16, 8, 8 );            
+
+            WriteBits(pLoc,rFields.nPredControl, 19,16);
+            WriteBit(pLoc,rFields.bPredInvert,20);
+            
               
             WriteBit( pLoc, rFields.bMaskControl, 9 );
             WriteBits( pLoc, (rFields.bNoDDChk<<1)|rFields.bNoDDClr, 11, 10 );
@@ -786,6 +799,8 @@ namespace GEN
     
             WriteBit( pLoc, rFields.dwFlagRegNum,    90 );
             WriteBit( pLoc, rFields.dwFlagSubRegNum, 89 );
+
+            
 
             if( bAlign16 )
             {
@@ -802,6 +817,7 @@ namespace GEN
                 }
                 WriteBits(pLoc, rFields.dwDestWriteMask, 51,48 );
                 WriteBits(pLoc, rFields.Dest.dwHStride, 62,61 );
+
             }
             else
             {
@@ -831,8 +847,6 @@ namespace GEN
                 // Write Src0 reg
                 WriteSourceRegFields( pLoc+8, rFields.Src0, !bAlign16 );
 
-                // TODO: Flag reg stuff
-
                 if( rFields.Src0.dwRegFile == RF_IMM ||
                     rFields.Src1.dwRegFile == RF_IMM ||
                     eOp == OP_SEND ||
@@ -847,10 +861,48 @@ namespace GEN
                     WriteSourceRegFields( pLoc+12, rFields.Src1, !bAlign16 );
                 }
             }
-            
-
         }
        
+        void WriteInstructionFields3Src( uint8* pLoc, const InstructionFields& rFields, Operations eOp )
+        {
+            WriteBits( pLoc, rFields.dwOpcode, 7, 0 );
+            WriteBit( pLoc, rFields.bMaskControl, 9 );
+            WriteBits( pLoc, (rFields.bNoDDChk<<1)|rFields.bNoDDClr, 11, 10 );
+            WriteBits( pLoc, rFields.nQtrControl, 13,12 );
+            WriteBits( pLoc, rFields.nThreadControl, 15,14 );
+            WriteBits( pLoc, rFields.nPredControl,19,16);
+            WriteBit( pLoc, rFields.bPredInvert,20 );
+            WriteBits( pLoc, rFields.nExecSize,23,21);
+            WriteBits( pLoc, rFields.nCondModifier,27,24);
+            WriteBit( pLoc, rFields.bAccumWrite,28 );
+            WriteBit( pLoc, rFields.bAccumWrite,31 );
+            
+            WriteBit( pLoc, rFields.dwFlagSubRegNum, 33 );
+            WriteBit( pLoc, rFields.dwFlagRegNum, 34 );
+            WriteBits( pLoc, rFields.Src0.dwModifier, 37,36);
+            WriteBits( pLoc, rFields.Src1.dwModifier, 39,38);
+            WriteBits( pLoc, rFields.Src2.dwModifier, 41,40);
+            WriteBits( pLoc, rFields.Src0.dwDataType, 43,42);
+            WriteBits( pLoc, rFields.Dest.dwDataType, 45,44);
+            WriteBits( pLoc, rFields.dwDestWriteMask, 52,49);
+            
+            WriteBits( pLoc, rFields.Dest.dwSubRegNum>>2, 55,53);
+            WriteBits( pLoc, rFields.Dest.dwRegNum,       63,56);
+            
+            WriteBits( pLoc, rFields.Src0.dwChanSel,      72,65);
+            WriteBits( pLoc, rFields.Src0.dwSubRegNum>>2, 75,73);
+            WriteBits( pLoc, rFields.Src0.dwRegNum,       83,76);
+            
+            WriteBits( pLoc, rFields.Src1.dwChanSel,      93,86);
+            WriteBits( pLoc, rFields.Src1.dwSubRegNum>>2, 95,94);
+            WriteBits( pLoc, rFields.Src1.dwRegNum,       104,97);
+            
+            WriteBits( pLoc, rFields.Src2.dwChanSel,      114,107);
+            WriteBits( pLoc, rFields.Src2.dwSubRegNum>>2, 117,115);
+            WriteBits( pLoc, rFields.Src2.dwRegNum,       125,118);           
+        }
+
+
         static void DecodeRegNumAndType( RegisterFields& reg )
         {
             switch( reg.dwRegFile )
@@ -1016,6 +1068,11 @@ namespace GEN
             fields.Src0.bAlign16 = fields.bAlign16;
             fields.Src1.bAlign16 = fields.bAlign16;
             fields.Src2.bAlign16 = fields.bAlign16;
+
+            if( fields.Src1.dwRegFile == RF_IMM ) 
+                fields.Src1.dwModifier = 0;
+            if( fields.Src0.dwRegFile == RF_IMM )
+                fields.Src0.dwModifier = 0;
 
         }
 
@@ -1341,7 +1398,7 @@ namespace GEN
         pInst->m_Source1      = _INTERNAL::InterpretSource(fields.Src1);
         pInst->m_Source2      = _INTERNAL::InterpretSource(fields.Src2);
         pInst->m_Predicate.Set( (PredicationModes) fields.nPredControl, fields.bPredInvert );
-        
+        pInst->m_Flags         = _INTERNAL::InterpretFlagReference(fields);
         return 16;
     }
 
@@ -1355,7 +1412,7 @@ namespace GEN
         pInst->m_bNoWriteMask = fields.bMaskControl;
         pInst->m_bNoDDChk     = fields.bNoDDChk;
         pInst->m_Predicate.Set( (PredicationModes) fields.nPredControl, fields.bPredInvert );
-        
+        pInst->m_Flags         = _INTERNAL::InterpretFlagReference(fields);
         if( eOp == OP_DIM )
             memcpy( pInst->m_ImmediateOperand, &fields.IMM64, 8 );
         else
@@ -1390,7 +1447,6 @@ namespace GEN
                 pInst->m_Dest    = _INTERNAL::InterpretDest(fields);
                 pInst->m_Source0 = _INTERNAL::InterpretSource(fields.Src0);
                 pInst->m_eCondModifier = fields.nCondModifier;
-                pInst->m_Flags         = _INTERNAL::InterpretFlagReference(fields);
                 return pInst->m_Dest.IsValid() && pInst->m_Source0.IsValid();
             }
             break;
@@ -1428,7 +1484,6 @@ namespace GEN
                 pInst->m_Source0        = _INTERNAL::InterpretSource(fields.Src0);
                 pInst->m_Source1        = _INTERNAL::InterpretSource(fields.Src1);
                 pInst->m_eCondModifier  = fields.nCondModifier;
-                pInst->m_Flags          = _INTERNAL::InterpretFlagReference(fields);
                 return pInst->m_Dest.IsValid() && pInst->m_Source0.IsValid() && pInst->m_Source1.IsValid();
             }
             break; // two source arithmetic
@@ -1499,7 +1554,7 @@ namespace GEN
         pInst->m_bNoWriteMask   = fields.bMaskControl;
         pInst->m_bEOT           = bEOT;
         pInst->m_Predicate.Set( (PredicationModes) fields.nPredControl, fields.bPredInvert );
-        
+        pInst->m_Flags         = _INTERNAL::InterpretFlagReference(fields);
         return 16;
     }
 
@@ -1518,7 +1573,7 @@ namespace GEN
         pInst->m_nExecSize      = fields.nExecSize;
         pInst->m_bNoWriteMask   = fields.bMaskControl;
         pInst->m_Predicate.Set( (PredicationModes) fields.nPredControl, fields.bPredInvert );
-        
+        pInst->m_Flags         = _INTERNAL::InterpretFlagReference(fields);
         return 16;
     }
 
@@ -1543,7 +1598,22 @@ namespace GEN
             memset(&fields,0,sizeof(fields));
             fields.bMaskControl = rInst.IsWriteMaskDisabled();
             fields.bNoDDChk = rInst.IsDDCheckDisabled();
-                    
+            
+            // TODO: Handle Other conditions where we must pick align16 or align1
+            fields.bAlign16 = false;
+            switch( rInst.GetPredicate().GetMode() )
+            {
+            case PM_SWIZZLE_X:
+            case PM_SWIZZLE_Y:
+            case PM_SWIZZLE_Z:
+            case PM_SWIZZLE_W:
+                fields.bAlign16 = true;
+                break;
+            }
+
+            _INTERNAL::FillFlagFields( fields, rInst.GetFlagReference() );
+            _INTERNAL::FillPredicationFields( fields, rInst.GetPredicate() );
+
             memset( pOutputBytes, 0, 16 );
 
             switch( pOps[i].GetClass() )
@@ -1557,7 +1627,6 @@ namespace GEN
                     fields.IMM64 = it.GetImmediate<uint64>();
                     _INTERNAL::FillDestRegFields( fields.Dest, it.GetDest() );
                     _INTERNAL::FillSourceRegFields( fields.Src0, it.GetSource0() );
-                    
                     _INTERNAL::WriteInstructionFields2Src(pOutputBytes, fields, rInst.GetOperation() );
                 }
                 break;
@@ -1572,7 +1641,6 @@ namespace GEN
                     _INTERNAL::FillDestRegFields( fields.Dest, it.GetDest() );
                     _INTERNAL::FillSourceRegFields( fields.Src0, it.GetSource0() );
                     _INTERNAL::FillSourceRegFields( fields.Src1, it.GetSource1() );
-                    _INTERNAL::FillFlagFields( fields, it.GetFlagReference() );
                   
                     // Docs state that the 'switch threads' threadmode must be used if dest is null
                     //  Smells like a HW bug.  Force it here just in case
@@ -1601,6 +1669,8 @@ namespace GEN
                     _INTERNAL::FillSourceRegFields( fields.Src2, it.GetSource2() );
                     
                     // TODO: Three-source instruction encode/decode
+                    
+                    _INTERNAL::WriteInstructionFields3Src(pOutputBytes, fields, rInst.GetOperation() );
                 }
                 break;
 

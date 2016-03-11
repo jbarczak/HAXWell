@@ -78,11 +78,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AssemblerTest.cpp" />
     <ClCompile Include="BlockReadCost.cpp" />
+    <ClCompile Include="BlockVsScatterReads.cpp" />
     <ClCompile Include="Nbody.cpp" />
     <ClCompile Include="ScatteredReadCost.cpp" />
     <ClCompile Include="InstructionCacheCliff.cpp" />
     <ClCompile Include="Misc.cpp" />
+    <ClCompile Include="src\autogen\GENAssembler_Bison.cpp" />
+    <ClCompile Include="src\autogen\GENAssembler_Flex.cpp" />
+    <ClCompile Include="src\GENAssembler.cpp" />
+    <ClCompile Include="src\GENAssembler_Parser.cpp" />
     <ClCompile Include="ThreadTimings.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="src\GENCoder.cpp" />
@@ -93,13 +99,41 @@
     <ClCompile Include="InstructionIssue.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\GENAssembler.h" />
     <ClInclude Include="include\GENCoder.h" />
     <ClInclude Include="include\GENDisassembler.h" />
     <ClInclude Include="include\GENIsa.h" />
     <ClInclude Include="include\HAXWell.h" />
     <ClInclude Include="include\HAXWell_Utils.h" />
-    <ClInclude Include="include\Timer.h" />
     <ClInclude Include="Misc.h" />
+    <ClInclude Include="src\autogen\GENAssembler_Bison.hpp" />
+    <ClInclude Include="src\GENAssembler_Parser.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="src\GENAssembler_Flex.l">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"$(SolutionDir)flex.bat"
+</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Flexing </Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)src\autogen\GENAssembler_Flex.cpp</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"$(SolutionDir)flex.bat"
+</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Flexing </Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)src\autogen\GENAssembler_Flex.cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+      </AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+      </AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="src\GENAssembler_Bison.y">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)bison.bat</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Bisoning</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)bison.bat</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Bisoning</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)src\autogen\GENAssembler_Bison.cpp;$(SolutionDir)src\autogen\GENAssembler_Bison.hpp</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)src\autogen\GENAssembler_Bison.cpp;$(SolutionDir)src\autogen\GENAssembler_Bison.hpp</Outputs>
+    </CustomBuild>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

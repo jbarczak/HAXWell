@@ -191,7 +191,7 @@ namespace GEN
     }
 
    
-    SendInstruction DWordScatteredReadSIMD8( uint32 nBindTableIndex, uint32 nAddress, uint32 nData )
+    SendInstruction DWordScatteredRead_SIMD8( uint32 nBindTableIndex, GEN::RegReference addr, GEN::RegReference data )
     {
         uint32 dwDescriptor = 0;
         dwDescriptor  = (0x1<<25); // message length (1 gpr)
@@ -201,8 +201,53 @@ namespace GEN
         dwDescriptor |=  (nBindTableIndex&0xff);
 
         SendInstruction write( SFID_DP_DC0, dwDescriptor,
-                                DestOperand( DT_U32, RegisterRegion( DirectRegReference(REG_GPR,nData),8,8,1)),
-                                SourceOperand( DT_U32,  RegisterRegion( DirectRegReference(REG_GPR,nAddress),8,8,1)) );
+                                DestOperand( DT_U32, RegisterRegion( data,8,8,1)),
+                                SourceOperand( DT_U32,  RegisterRegion( addr,8,8,1)) );
+        return write;
+    }
+    SendInstruction DWordScatteredRead_SIMD16( uint32 nBindTableIndex, GEN::RegReference addr, GEN::RegReference data )
+    {
+        uint32 dwDescriptor = 0;
+        dwDescriptor  = (0x2<<25); // message length (2 gpr)
+        dwDescriptor |= (2<<20);   // response length (2 gpr)
+        dwDescriptor |= 0x3<<14;   // message type (dword scattered read)
+        dwDescriptor |= 0x300;     // block length (16 dwords)
+        dwDescriptor |=  (nBindTableIndex&0xff);
+
+        SendInstruction write( SFID_DP_DC0, dwDescriptor,
+                                DestOperand( DT_U32, RegisterRegion( data,8,8,1)),
+                                SourceOperand( DT_U32,  RegisterRegion( addr,8,8,1)) );
+        return write;
+    }
+
+
+    SendInstruction DWordScatteredWrite_SIMD8( uint32 nBindTableIndex, GEN::RegReference addr, GEN::RegReference writeCommit)
+    {
+        uint32 dwDescriptor = 0;
+        dwDescriptor  = (0x2<<25); // message length (2 gpr)
+        dwDescriptor |= (0<<20);   // response length (0 gpr)
+        dwDescriptor |= 0xB<<14;   // message type (dword scattered write)
+        dwDescriptor |= 0x200;     // block length (8 dwords)
+        dwDescriptor |=  (nBindTableIndex&0xff);
+
+            
+        SendInstruction write( SFID_DP_DC1, dwDescriptor,
+                                DestOperand( DT_U32, RegisterRegion(writeCommit,8,8,1)),
+                                SourceOperand( DT_U32,  RegisterRegion( addr,8,1,8)) );
+        return write;
+    }
+    SendInstruction DWordScatteredWrite_SIMD16( uint32 nBindTableIndex, GEN::RegReference addr, GEN::RegReference writeCommit )
+    {
+        uint32 dwDescriptor = 0;
+        dwDescriptor  = (0x2<<25); // message length (4 gpr)
+        dwDescriptor |= (0<<20);   // response length (0 gpr)
+        dwDescriptor |= 0xB<<14;   // message type (dword scattered write)
+        dwDescriptor |= 0x300;     // block length (16 dwords)
+        dwDescriptor |=  (nBindTableIndex&0xff);
+
+        SendInstruction write( SFID_DP_DC0, dwDescriptor,
+                               DestOperand( DT_U32, RegisterRegion(writeCommit,8,8,1)),
+                                SourceOperand( DT_U32,  RegisterRegion( addr,8,8,1)) );
         return write;
     }
    
@@ -256,7 +301,7 @@ namespace GEN
         return GEN::BinaryInstruction( nExecSize, eOp, 
                                       DestOperand( eType, RegisterRegion( DirectRegReference(nDstReg),v,w,h) ),
                                       SourceOperand(eType,RegisterRegion( DirectRegReference(nSrc0),v,w,h) ),
-                                      SourceOperand(eType), imm 
+                                      SourceOperand(eType, imm)
                                       );
     }
 
@@ -275,7 +320,7 @@ namespace GEN
         return GEN::UnaryInstruction( 8, 
                                       GEN::OP_MOV,
                                       DestOperand( DT_U32, RegisterRegion( DirectRegReference(REG_GPR,nDstReg,0),8,8,1) ),
-                                      SourceOperand(DT_U32), IMM 
+                                      SourceOperand(DT_U32, IMM )
                                       );
     }
 

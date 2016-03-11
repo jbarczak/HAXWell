@@ -14,8 +14,14 @@ void FindICacheCliff();
 void IssueTest();
 void BlockReadTest();
 void ScatteredReadTest();
-
+void ScatterVsGather();
 void Nbody();
+
+
+
+void AssemblerTest();
+
+
 
 int main( int argc, char* argv[] )
 {
@@ -31,6 +37,7 @@ int main( int argc, char* argv[] )
     //IssueTest();
     //BlockReadTest();
     //ScatteredReadTest();
+    //ScatterVsGather();
 
     
      /* 
@@ -53,8 +60,9 @@ int main( int argc, char* argv[] )
       InstructionIssueTest(1,16); 
       */
    
-    Nbody();
-
+    //Nbody();
+    
+    AssemblerTest();
 
     return 0;
 }

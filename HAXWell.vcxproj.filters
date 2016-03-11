@@ -7,6 +7,9 @@
     <Filter Include="src">
       <UniqueIdentifier>{a89fbfd3-1b6b-4af5-898f-695969f78fa3}</UniqueIdentifier>
     </Filter>
+    <Filter Include="src\autogen">
+      <UniqueIdentifier>{fbae03fa-f5fa-47f5-a673-3557949d846a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\HAXWell.h">
@@ -25,7 +28,15 @@
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="Misc.h" />
-    <ClInclude Include="include\Timer.h" />
+    <ClInclude Include="src\GENAssembler_Parser.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\autogen\GENAssembler_Bison.hpp">
+      <Filter>src\autogen</Filter>
+    </ClInclude>
+    <ClInclude Include="include\GENAssembler.h">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\GENCoder.cpp">
@@ -51,5 +62,27 @@
     <ClCompile Include="BlockReadCost.cpp" />
     <ClCompile Include="ScatteredReadCost.cpp" />
     <ClCompile Include="Nbody.cpp" />
+    <ClCompile Include="BlockVsScatterReads.cpp" />
+    <ClCompile Include="src\GENAssembler.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\autogen\GENAssembler_Bison.cpp">
+      <Filter>src\autogen</Filter>
+    </ClCompile>
+    <ClCompile Include="src\autogen\GENAssembler_Flex.cpp">
+      <Filter>src\autogen</Filter>
+    </ClCompile>
+    <ClCompile Include="src\GENAssembler_Parser.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="AssemblerTest.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="src\GENAssembler_Bison.y">
+      <Filter>src</Filter>
+    </CustomBuild>
+    <CustomBuild Include="src\GENAssembler_Flex.l">
+      <Filter>src</Filter>
+    </CustomBuild>
   </ItemGroup>
 </Project>

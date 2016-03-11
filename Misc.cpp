@@ -12,10 +12,12 @@ void PrintISA( FILE* fp, HAXWell::Blob& blob )
     public:
         virtual void Push( const char* p )
         {
-            printf("%s", p );
+            fprintf(fp,"%s", p );
         }
+        FILE* fp;
     };
     Printer printer;
+    printer.fp = fp;
     GEN::Decoder dec;
     GEN::Disassemble( printer, &dec, blob.GetBytes(), blob.GetLength() );
 }

@@ -387,6 +387,8 @@ namespace GEN
 
         /// Measured in bytes
         size_t GetSubRegOffset() const { return Direct.m_nRegOffset; }
+
+        void SetRegNumber( size_t reg ) { Direct.m_nRegNum = reg; }
     };
 
     class IndirectRegReference : public RegReference
@@ -445,31 +447,66 @@ namespace GEN
     public:
 
         SourceOperand( ) : m_eDataType(DT_INVALID), m_bImmediate(false), m_eModifier(SM_NONE){}
-        SourceOperand( DataTypes eType ) : m_eDataType(eType), m_bImmediate(true),m_eModifier(SM_NONE){};
-        SourceOperand( DataTypes eType, const RegisterRegion& reg ) : m_eDataType(eType), m_Reg(reg), m_bImmediate(false){}
+        SourceOperand( DataTypes eType, uint32 IMM ) : m_eDataType(eType), m_bImmediate(true),m_eModifier(SM_NONE)
+        {
+            memcpy(fields.Imm,&IMM,sizeof(IMM));
+        }
+        SourceOperand( float IMM ) : m_eDataType(DT_F32), m_bImmediate(true),m_eModifier(SM_NONE)
+        {
+            memcpy(fields.Imm,&IMM,sizeof(IMM));
+        }
+
+        SourceOperand( DataTypes eType, const RegisterRegion& reg ) : m_eDataType(eType), m_bImmediate(false)
+        {
+            SetRegRegion(reg);
+        }
         
         SourceOperand( DataTypes eType, SourceModifiers eMod ) : m_eDataType(eType), m_bImmediate(true),m_eModifier(eMod){};
-        SourceOperand( DataTypes eType, const RegisterRegion& reg, SourceModifiers eMod ) : m_eDataType(eType), m_Reg(reg), m_bImmediate(false) ,m_eModifier(eMod){}
+        SourceOperand( DataTypes eType, const RegisterRegion& reg, SourceModifiers eMod ) 
+            : m_eDataType(eType), m_bImmediate(false) ,m_eModifier(eMod)
+        {
+            SetRegRegion(reg);
+        }
 
         bool IsImmediate() const { return m_bImmediate != 0; }
         DataTypes GetDataType() const { return (DataTypes)m_eDataType; }
-        RegisterRegion GetRegRegion() const { return m_Reg; }
+        RegisterRegion GetRegRegion() const { return RegisterRegion(fields.Reg.m_Base,fields.Reg.m_nVStride,fields.Reg.m_nWidth, fields.Reg.m_nHStride); }
         SourceModifiers GetModifier() const { return (SourceModifiers)m_eModifier; };
+        void SetModifier(SourceModifiers eMod) { m_eModifier = eMod; };
+
+        void SetRegRegion( RegisterRegion reg )
+        {
+            fields.Reg.m_Base     = reg.GetBaseRegister();
+            fields.Reg.m_nHStride = reg.GetHStride();
+            fields.Reg.m_nVStride = reg.GetVStride();
+            fields.Reg.m_nWidth   = reg.GetWidth();
+        }
 
         Swizzle GetSwizzle() const { return m_Swizzle; }
 
         bool IsValid() const
         {
-            return m_eDataType != DT_INVALID && (m_bImmediate || m_Reg.IsValid());
+            return m_eDataType != DT_INVALID && (m_bImmediate || fields.Reg.m_Base.GetRegType() != REG_INVALID );
         }
 
+        const uint8* GetImmediateBits() const { return fields.Imm; }
     private:
 
         Swizzle m_Swizzle;
         DataTypes m_eDataType;
         uint8 m_bImmediate;
         uint8 m_eModifier;
-        RegisterRegion m_Reg;
+        union
+        {
+            struct 
+            {
+                RegReference m_Base;
+                uint8 m_nHStride;   ///< Step size in elements between adjacent elements in a "row"
+                uint8 m_nVStride;   ///< Step size in elements between successive rows
+                uint8 m_nWidth;     ///< Number of data elements per row
+            } Reg;
+            uint8 Imm[8];
+        } fields;
     };
 
 
@@ -526,6 +563,7 @@ namespace GEN
 
         FlagReference GetFlagReference() const { return m_Flags; }
         void SetFlagReference( const FlagReference& rFlag ) { m_Flags = rFlag; }
+        void SetPredicate( Predicate p ) { m_Predicate = p; }
 
     protected:
         Instruction( InstructionClass e ) 
@@ -596,19 +634,12 @@ namespace GEN
             m_nExecSize = nExecSize;
             m_Dest = dst;
             m_Source0 = src;
+            m_eCondModifier = CM_NONE;
+            if( src.IsImmediate() )
+                memcpy( &m_ImmediateOperand, src.GetImmediateBits(), 8 );
         }
-        UnaryInstruction( size_t nExecSize, Operations eOp, DestOperand dst, SourceOperand src, uint32 imm ) 
-            : Instruction(IC_UNARY) 
-        {
-            m_eOp = eOp;
-            m_nExecSize = nExecSize;
-            m_Dest = dst;
-            m_Source0 = src;
-            
-            memcpy( &m_ImmediateOperand, &imm, 4 );
-        }
+       
 
-            
         ConditionalModifiers GetConditionModifier() const { return (ConditionalModifiers)m_eCondModifier; }
     
 
@@ -633,17 +664,12 @@ namespace GEN
             m_Dest = dst;
             m_Source0 = src0;
             m_Source1 = src1;
+            m_eCondModifier = CM_NONE;
+            if( src1.IsImmediate() )
+                memcpy( &m_ImmediateOperand, src1.GetImmediateBits(), 8 );
+            
         }
-        BinaryInstruction( size_t nExecSize, Operations eOp, DestOperand dst, SourceOperand src0, SourceOperand src1, uint32 imm ) 
-            : Instruction(IC_BINARY) 
-        {
-            m_eOp = eOp;
-            m_nExecSize = nExecSize;
-            m_Dest = dst;
-            m_Source0 = src0;
-            m_Source1 = src1;
-            memcpy( &m_ImmediateOperand, &imm, 4 );
-        }
+       
            
         ConditionalModifiers GetConditionModifier() const { return (ConditionalModifiers)m_eCondModifier; }
     
@@ -652,6 +678,7 @@ namespace GEN
         const SourceOperand& GetSource0() const { return m_Source0; };
         const SourceOperand& GetSource1() const { return m_Source1; };
     
+        void SetConditionalModifier( ConditionalModifiers e ) { m_eCondModifier = e; }
 
     };
 
@@ -659,6 +686,18 @@ namespace GEN
     {
     public:
         TernaryInstruction() : Instruction(IC_TERNARY) {}
+        TernaryInstruction( size_t nExecSize, Operations eOp, DestOperand dst, SourceOperand src0, SourceOperand src1, SourceOperand src2 )
+            : Instruction(IC_TERNARY)
+        {
+            m_eOp = eOp;
+            m_nExecSize = nExecSize;
+            m_Dest = dst;
+            m_Source0 = src0;
+            m_Source1 = src1;
+            m_Source2 = src2;
+            m_eCondModifier = CM_NONE;
+        }
+
         ConditionalModifiers GetConditionModifier() const { return (ConditionalModifiers)m_eCondModifier; }
     
         size_t GetExecSize() const { return m_nExecSize; }
@@ -735,6 +774,16 @@ namespace GEN
             m_Dest = dst;
             m_Source0 = src0;
             m_Source1 = src1;
+        }
+        MathInstruction( size_t nExecSize, MathFunctionIDs eFunction, DestOperand dst, SourceOperand src0 ) 
+            : Instruction(IC_MATH) 
+        {
+            m_eOp = OP_MATH;
+            m_eFunctionCtrl = eFunction;
+            m_nExecSize = nExecSize;
+            m_Dest = dst;
+            m_Source0 = src0;
+            m_Source1 = SourceOperand(GEN::DT_INVALID, GEN::RegisterRegion( GEN::DirectRegReference( REG_NULL, 0 ),0,0,0 ) );
         }
         size_t GetExecSize() const { return m_nExecSize; }
         const DestOperand& GetDest() const { return m_Dest; }
@@ -814,11 +863,22 @@ namespace GEN
     SendInstruction OWordDualBlockReadAndInvalidate( uint32 nBindTableIndex, uint32 nAddress, uint32 nData );
       
 
-    /// Send DWORD gather read message
-    ///     
-    SendInstruction DWordScatteredReadSIMD8( uint32 nBindTableIndex, uint32 nAddress, uint32 nData );
+    /// Send DWORD gather read/write message
+    ///     Writes must have addr+data together in consecutive regs
       
-
+    SendInstruction DWordScatteredRead_SIMD8( uint32 nBindTableIndex, RegReference address, RegReference data );
+    SendInstruction DWordScatteredRead_SIMD16( uint32 nBindTableIndex, RegReference nAddress, RegReference nData );
+    SendInstruction DWordScatteredWrite_SIMD8( uint32 nBindTableIndex, RegReference address, RegReference writeCommit );
+    SendInstruction DWordScatteredWrite_SIMD16( uint32 nBindTableIndex, RegReference nAddress, RegReference writeCommit );
+ 
+    inline SendInstruction DWordScatteredReadSIMD8( uint32 nBindTableIndex, uint32 nAddress, uint32 nData )
+    {
+        return DWordScatteredRead_SIMD8( nBindTableIndex,  
+                                       GEN::DirectRegReference(REG_GPR,nAddress), 
+                                       GEN::DirectRegReference(REG_GPR, nData ) );
+    }
+      
+    
     UnaryInstruction RegMove(  RegTypes eDstType, uint32 nDstReg, RegTypes eSrcType, uint32 nSrcReg );
     UnaryInstruction RegMoveIMM(  uint32 nDstReg, uint32 IMM );
 

@@ -229,4 +229,4 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
-
+src/autogen/*

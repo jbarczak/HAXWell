@@ -379,6 +379,12 @@ namespace GEN
                     char Src1[64];
                     const GEN::MathInstruction& rMath = static_cast<const GEN::MathInstruction&>(op);
 
+                     
+                    char Pred[64];
+                    FormatPredicate(Pred,rMath.GetPredicate(), rMath.GetFlagReference() );
+                    if( rMath.GetPredicate().GetMode() != PM_NONE )
+                        Printf(printer, "     PRED(%s)", Pred );
+
                     FormatDest(Dest, rMath.GetDest(), rMath.GetExecSize() );
                     FormatSource(Src0, rMath.GetSource0(), rMath );
                     FormatSource(Src1, rMath.GetSource1(), rMath );
@@ -400,13 +406,19 @@ namespace GEN
                     }
 
                     Printf(printer, OPCODE_FORMAT"(%u)""%16s,%16s,%16s", pOperation, rMath.GetExecSize(), Dest, Src0, Src1 );
-                    
+                   
                 }
                 break;
 
             case IC_UNARY:
                 {
                     const GEN::UnaryInstruction& rInst = static_cast<const GEN::UnaryInstruction&>( op );
+                    
+                    char Pred[64];
+                    FormatPredicate(Pred,rInst.GetPredicate(), rInst.GetFlagReference() );
+                    if( rInst.GetPredicate().GetMode() != PM_NONE )
+                        Printf(printer, "     PRED(%s)", Pred );
+
                     FormatDest(Dst,rInst.GetDest(), rInst.GetExecSize());
                     FormatSource(Src0,rInst.GetSource0(),rInst);
 
@@ -418,6 +430,8 @@ namespace GEN
 
                     if( rInst.GetConditionModifier() != CM_NONE )
                         Printf( printer, "  cm(%s)", GEN::ConditionalModifierToString(rInst.GetConditionModifier()) );
+
+                   
                     
                 }
                 break;
@@ -425,6 +439,11 @@ namespace GEN
             case IC_BINARY:
                 {
                     const GEN::BinaryInstruction& rInst = static_cast<const GEN::BinaryInstruction&>( op );
+                    char Pred[64];
+                    FormatPredicate(Pred,rInst.GetPredicate(), rInst.GetFlagReference() );
+                    if( rInst.GetPredicate().GetMode() != PM_NONE )
+                        Printf(printer, "     PRED(%s)", Pred );
+
                     FormatDest(Dst,rInst.GetDest(), rInst.GetExecSize());
                     FormatSource(Src0,rInst.GetSource0(),rInst);
                     FormatSource(Src1,rInst.GetSource1(),rInst);
@@ -456,13 +475,19 @@ namespace GEN
                         if( rInst.GetConditionModifier() != CM_NONE )
                             Printf( printer, "  cm(%s)", GEN::ConditionalModifierToString(rInst.GetConditionModifier()) );
                     }
+
                 }
                 break;
 
             case IC_TERNARY:
                 {
-                    
                     const GEN::TernaryInstruction& rInst = static_cast<const GEN::TernaryInstruction&>( op );
+                    
+                    char Pred[64];
+                    FormatPredicate(Pred,rInst.GetPredicate(), rInst.GetFlagReference() );
+                    if( rInst.GetPredicate().GetMode() != PM_NONE )
+                        Printf(printer, "     PRED(%s)", Pred );
+
                     FormatDest(Dst,rInst.GetDest(), rInst.GetExecSize());
                     FormatSource(Src0,rInst.GetSource0(),rInst);
                     FormatSource(Src1,rInst.GetSource1(),rInst);
@@ -477,6 +502,7 @@ namespace GEN
                             Src1,
                             Src2);
 
+              
                 }
                 break;
             case IC_NULL:
