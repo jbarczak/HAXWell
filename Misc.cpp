@@ -22,6 +22,22 @@ void PrintISA( FILE* fp, HAXWell::Blob& blob )
     GEN::Disassemble( printer, &dec, blob.GetBytes(), blob.GetLength() );
 }
 
+void PrintISA( FILE* fp, const void* pBytes, size_t nBytes )
+{
+    class Printer : public GEN::IPrinter{
+    public:
+        virtual void Push( const char* p )
+        {
+            fprintf(fp,"%s", p );
+        }
+        FILE* fp;
+    };
+    Printer printer;
+    printer.fp = fp;
+    GEN::Decoder dec;
+    GEN::Disassemble( printer, &dec, pBytes, nBytes );
+}
+
 
 int GetLinearThreadID( size_t sr )
 {

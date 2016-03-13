@@ -60,9 +60,9 @@ int main( int argc, char* argv[] )
       InstructionIssueTest(1,16); 
       */
    
-    //Nbody();
+    Nbody();
     
-    AssemblerTest();
+   // AssemblerTest();
 
     return 0;
 }

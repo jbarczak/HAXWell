@@ -172,6 +172,21 @@ namespace HAXWell
            uint g_TID3[];
         };
 
+         
+        layout (std430,binding=4)
+        buffer Output4
+        {
+           uint g_TID4[];
+        };
+
+         
+        layout (std430,binding=5)
+        buffer Output5
+        {
+           uint g_TID5[];
+        };
+
+
         void main() 
         {
             uvec2 tid = gl_GlobalInvocationID.xy;
@@ -179,6 +194,8 @@ namespace HAXWell
             g_TID1[tid.x] = tid.x*2;
             g_TID2[tid.x] = tid.x*4;
             g_TID3[tid.x] = tid.x*8;
+            g_TID4[tid.x] = tid.x*16;           
+            g_TID5[tid.x] = tid.x*32;
         }
     );
 
@@ -328,6 +345,28 @@ namespace HAXWell
             return 0;
         }
 
+        return (ShaderHandle)hProgram;
+    }
+
+    ShaderHandle CreateGLSLShader( const char* pGLSL )
+    {
+        // TODO: Handle compile/link fails
+        GLint length  = strlen(pGLSL);
+        GLuint hShader = glCreateShader( GL_COMPUTE_SHADER );
+        glShaderSource( hShader, 1, &pGLSL, &length );
+        glCompileShader( hShader );
+
+        
+        char pLog[2048];
+        GLsizei nLogSize;
+
+        glGetShaderInfoLog( hShader, sizeof(pLog), &nLogSize, pLog );
+
+        printf(pLog);
+
+        GLuint hProgram = glCreateProgram();
+        glAttachShader(hProgram,hShader);
+        glLinkProgram(hProgram);
         return (ShaderHandle)hProgram;
     }
 

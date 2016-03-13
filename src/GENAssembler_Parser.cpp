@@ -816,13 +816,15 @@ namespace _INTERNAL{
                 return;
             }
 
-            m_Instructions.push_back( 
-                GEN::BinaryInstruction( pOperation->nExecSize, OP_CMP,
+            auto op =  GEN::BinaryInstruction( pOperation->nExecSize, OP_CMP,
                     DestFromNode(pDst),
                     SourceFromNode(pSrc0),
-                    SourceFromNode(pSrc1) )
-                );
-            m_Instructions.back().SetFlagReference( pFlag->Flag );
+                    SourceFromNode(pSrc1) );
+               
+            op.SetFlagReference( pFlag->Flag );
+            op.SetConditionalModifier( (ConditionalModifiers)pID->ID );
+            
+            m_Instructions.push_back( op );
             return;
         }
 

@@ -564,7 +564,7 @@ namespace GEN
         FlagReference GetFlagReference() const { return m_Flags; }
         void SetFlagReference( const FlagReference& rFlag ) { m_Flags = rFlag; }
         void SetPredicate( Predicate p ) { m_Predicate = p; }
-
+        
     protected:
         Instruction( InstructionClass e ) 
             : m_eClass(e),
@@ -641,7 +641,8 @@ namespace GEN
        
 
         ConditionalModifiers GetConditionModifier() const { return (ConditionalModifiers)m_eCondModifier; }
-    
+        void SetConditionalModifier( ConditionalModifiers eMod ) { m_eCondModifier = eMod; }
+
 
         size_t GetExecSize() const { return m_nExecSize; }
         const DestOperand& GetDest() const { return m_Dest; }
@@ -672,14 +673,14 @@ namespace GEN
        
            
         ConditionalModifiers GetConditionModifier() const { return (ConditionalModifiers)m_eCondModifier; }
-    
+        void SetConditionalModifier( ConditionalModifiers eMod ) { m_eCondModifier = eMod; }
+
         size_t GetExecSize() const { return m_nExecSize; }
         const DestOperand& GetDest() const { return m_Dest; }
         const SourceOperand& GetSource0() const { return m_Source0; };
         const SourceOperand& GetSource1() const { return m_Source1; };
     
-        void SetConditionalModifier( ConditionalModifiers e ) { m_eCondModifier = e; }
-
+        
     };
 
     class TernaryInstruction : public Instruction
@@ -699,7 +700,8 @@ namespace GEN
         }
 
         ConditionalModifiers GetConditionModifier() const { return (ConditionalModifiers)m_eCondModifier; }
-    
+        void SetConditionalModifier( ConditionalModifiers eMod ) { m_eCondModifier = eMod; }
+
         size_t GetExecSize() const { return m_nExecSize; }
           
         const DestOperand& GetDest() const { return m_Dest; }
@@ -717,13 +719,13 @@ namespace GEN
             m_bMsgDescriptorFromReg = 0;
             m_bEOT = 0;
         }
-        SendInstruction( SharedFunctionIDs eDest, uint32 nDescriptor, DestOperand dst, SourceOperand src0 )
+        SendInstruction( size_t nExec, SharedFunctionIDs eDest, uint32 nDescriptor, DestOperand dst, SourceOperand src0 )
             : Instruction( IC_SEND )
         {
             m_eOp = OP_SEND;
             m_Source0   = src0;
             m_Dest      = dst;
-            m_nExecSize = 8;
+            m_nExecSize = nExec;
             m_eSFID = eDest;
             m_bEOT=0;
             m_bMsgDescriptorFromReg=0;
@@ -735,7 +737,7 @@ namespace GEN
         uint32 GetDescriptorIMM() const { return GetImmediate<uint32>(); }
         const DestOperand& GetDest() const { return m_Dest; }
         const SourceOperand& GetSource() const { return m_Source0; }
-
+        size_t GetExecSize() const { return m_nExecSize; }
         SharedFunctionIDs GetRecipient() const { return (SharedFunctionIDs)m_eSFID; }
 
         void SetEOT( ) { m_bEOT = true; };

@@ -119,7 +119,7 @@ namespace GEN
 
     SendInstruction SendEOT( uint32 nSourceGPR )
     {
-        SendInstruction eot( SFID_SPAWNER, 0x02000010, 
+        SendInstruction eot( 16,SFID_SPAWNER, 0x02000010, 
                               DestOperand( DT_U32, RegisterRegion( DirectRegReference(REG_NULL,0),8,1,8)),
                               SourceOperand( DT_U32,  RegisterRegion( DirectRegReference(REG_GPR,nSourceGPR),8,1,8)) );
         eot.SetEOT();
@@ -135,7 +135,7 @@ namespace GEN
         dwDescriptor |= (0x2e) <<8;  
         dwDescriptor |= (nBindTableIndex & 0xff);
             
-        SendInstruction write( SFID_DP_DC1, dwDescriptor,
+        SendInstruction write( 8,SFID_DP_DC1, dwDescriptor,
                                 DestOperand( DT_U32, RegisterRegion( DirectRegReference(REG_NULL,0),8,1,8)),
                                 SourceOperand( DT_U32,  RegisterRegion( DirectRegReference(REG_GPR,nSourceGPR),8,1,8)) );
         return write;
@@ -150,7 +150,7 @@ namespace GEN
         dwDescriptor |= 0x200;   // block length (in owords)
         dwDescriptor |=  (nBindTableIndex&0xff);
 
-        SendInstruction write( SFID_DP_DC0, dwDescriptor,
+        SendInstruction write( 8,SFID_DP_DC0, dwDescriptor,
                                 DestOperand( DT_U32, RegisterRegion( DirectRegReference(REG_NULL,0),8,8,1)),
                                 SourceOperand( DT_U32,  RegisterRegion( DirectRegReference(REG_GPR,nSourceGPR),8,8,1)) );
         return write;
@@ -166,7 +166,7 @@ namespace GEN
         dwDescriptor |= 0x200;     // block length (in owords)
         dwDescriptor |=  (nBindTableIndex&0xff);
 
-        SendInstruction write( SFID_DP_DC0, dwDescriptor,
+        SendInstruction write( 8,SFID_DP_DC0, dwDescriptor,
                                 DestOperand( DT_U32, RegisterRegion( DirectRegReference(REG_GPR,nData),8,8,1)),
                                 SourceOperand( DT_U32,  RegisterRegion( DirectRegReference(REG_GPR,nAddress),8,8,1)) );
         return write;
@@ -184,7 +184,7 @@ namespace GEN
         dwDescriptor |= 0x200;     // block length (in owords)
         dwDescriptor |=  (nBindTableIndex&0xff);
 
-        SendInstruction write( SFID_DP_DC0, dwDescriptor,
+        SendInstruction write( 8,SFID_DP_DC0, dwDescriptor,
                                 DestOperand( DT_U32, RegisterRegion( DirectRegReference(REG_GPR,nData),8,8,1)),
                                 SourceOperand( DT_U32,  RegisterRegion( DirectRegReference(REG_GPR,nAddress),8,8,1)) );
         return write;
@@ -200,7 +200,7 @@ namespace GEN
         dwDescriptor |= 0x200;     // block length (8 dwords)
         dwDescriptor |=  (nBindTableIndex&0xff);
 
-        SendInstruction write( SFID_DP_DC0, dwDescriptor,
+        SendInstruction write( 8,SFID_DP_DC0, dwDescriptor,
                                 DestOperand( DT_U32, RegisterRegion( data,8,8,1)),
                                 SourceOperand( DT_U32,  RegisterRegion( addr,8,8,1)) );
         return write;
@@ -214,7 +214,7 @@ namespace GEN
         dwDescriptor |= 0x300;     // block length (16 dwords)
         dwDescriptor |=  (nBindTableIndex&0xff);
 
-        SendInstruction write( SFID_DP_DC0, dwDescriptor,
+        SendInstruction write( 16,SFID_DP_DC0, dwDescriptor,
                                 DestOperand( DT_U32, RegisterRegion( data,8,8,1)),
                                 SourceOperand( DT_U32,  RegisterRegion( addr,8,8,1)) );
         return write;
@@ -231,7 +231,7 @@ namespace GEN
         dwDescriptor |=  (nBindTableIndex&0xff);
 
             
-        SendInstruction write( SFID_DP_DC1, dwDescriptor,
+        SendInstruction write( 8,SFID_DP_DC0, dwDescriptor,
                                 DestOperand( DT_U32, RegisterRegion(writeCommit,8,8,1)),
                                 SourceOperand( DT_U32,  RegisterRegion( addr,8,1,8)) );
         return write;
@@ -239,13 +239,13 @@ namespace GEN
     SendInstruction DWordScatteredWrite_SIMD16( uint32 nBindTableIndex, GEN::RegReference addr, GEN::RegReference writeCommit )
     {
         uint32 dwDescriptor = 0;
-        dwDescriptor  = (0x2<<25); // message length (4 gpr)
+        dwDescriptor  = (0x4<<25); // message length (4 gpr)
         dwDescriptor |= (0<<20);   // response length (0 gpr)
         dwDescriptor |= 0xB<<14;   // message type (dword scattered write)
         dwDescriptor |= 0x300;     // block length (16 dwords)
         dwDescriptor |=  (nBindTableIndex&0xff);
 
-        SendInstruction write( SFID_DP_DC0, dwDescriptor,
+        SendInstruction write( 16,SFID_DP_DC0, dwDescriptor,
                                DestOperand( DT_U32, RegisterRegion(writeCommit,8,8,1)),
                                 SourceOperand( DT_U32,  RegisterRegion( addr,8,8,1)) );
         return write;
@@ -310,8 +310,8 @@ namespace GEN
     {
         return GEN::UnaryInstruction( 8, 
                                       GEN::OP_MOV,
-                                      DestOperand( DT_F32, RegisterRegion( DirectRegReference(eDstType,nDstReg,0),8,8,1) ),
-                                      SourceOperand(DT_F32, RegisterRegion( DirectRegReference(eSrcType,nSrcReg,0),8,8,1) )
+                                      DestOperand( DT_U32, RegisterRegion( DirectRegReference(eDstType,nDstReg,0),8,8,1) ),
+                                      SourceOperand(DT_U32, RegisterRegion( DirectRegReference(eSrcType,nSrcReg,0),8,8,1) )
                                       );
     }
     
@@ -333,7 +333,7 @@ namespace GEN
         dwDescriptor |= (1<<14); // yes hardware, please send me that ack message I'm expecting
         dwDescriptor |= (0x3);   // message type
 
-        SendInstruction msg( SFID_GATEWAY, dwDescriptor,
+        SendInstruction msg( 8,SFID_GATEWAY, dwDescriptor,
                                 DestOperand( DT_U32, RegisterRegion( DirectRegReference(nDest),8,8,1)),
                                 SourceOperand( DT_U32,  RegisterRegion( DirectRegReference(nSrc),8,8,1)) );
         return msg;

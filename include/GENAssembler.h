@@ -29,6 +29,7 @@ namespace GEN
 
             const void* GetCURBE() const { return m_pCURBE; }
             size_t GetCURBERegCount() const { return m_nCURBECount; }
+            size_t GetThreadsPerDispatch() const { return m_nThreadsPerGroup; }
         private:
             
             size_t m_nThreadsPerGroup;

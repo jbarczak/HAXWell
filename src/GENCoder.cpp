@@ -76,6 +76,14 @@ namespace GEN
            ENUM(DT_F32, 0x7 )
         END_TRANSLATOR(DataTypes,RegDataTypes,DT_INVALID)
 
+          // register data type field -> abstract enum
+        BEGIN_TRANSLATOR(DataTypes,RegDataTypes3Src)
+           ENUM(DT_F32, 0x0 ) 
+           ENUM(DT_S32, 0x1 )
+           ENUM(DT_U32, 0x2 )
+           ENUM(DT_F64, 0x3 )
+        END_TRANSLATOR(DataTypes,RegDataTypes3Src,DT_INVALID)
+
         // IMM data type field -> abstract enum
         BEGIN_TRANSLATOR(DataTypes,ImmDataTypes)
            ENUM(DT_U32,                0x0 ) 
@@ -731,6 +739,32 @@ namespace GEN
             FillRegFields(reg,rOperand.GetRegRegion(), rOperand.GetDataType() );
         }
      
+
+        void FillDestRegFields3Src( InstructionFields& fields, const GEN::DestOperand& rOperand )
+        {
+            // TODO: write mask
+            // TODO: sat modifier
+
+            auto& rDestReg = static_cast<DirectRegReference&>( rOperand.GetRegRegion().GetBaseRegister());
+            fields.Dest.bAlign16 = true;
+            fields.Dest.dwDataType = Encode_RegDataTypes3Src(rOperand.GetDataType());
+            fields.Dest.dwRegNum = rDestReg.GetRegNumber();
+            fields.Dest.dwSubRegNum = rDestReg.GetSubRegOffset();
+            fields.dwDestWriteMask = 0xffffffff;
+        }
+    
+        
+        void FillSourceRegFields3Src( RegisterFields& reg, const GEN::SourceOperand& rOperand )
+        {
+            // TODO: swizzle
+            auto& rSrcReg = static_cast<DirectRegReference&>( rOperand.GetRegRegion().GetBaseRegister());
+            reg.bAlign16 = true;
+            reg.dwDataType = Encode_RegDataTypes3Src(rOperand.GetDataType());
+            reg.dwRegNum = rSrcReg.GetRegNumber();
+            reg.dwSubRegNum = rSrcReg.GetSubRegOffset();
+            reg.dwModifier = rOperand.GetModifier();    
+            reg.dwChanSel = 0xE4;
+        }
     
         
         void WriteSourceRegFields( uint8* pLoc, const RegisterFields& reg, bool bAlign1 )
@@ -785,7 +819,7 @@ namespace GEN
             WriteBits(pLoc,rFields.nPredControl, 19,16);
             WriteBit(pLoc,rFields.bPredInvert,20);
             
-              
+            WriteBits(pLoc,rFields.nThreadControl, 15,14);
             WriteBit( pLoc, rFields.bMaskControl, 9 );
             WriteBits( pLoc, (rFields.bNoDDChk<<1)|rFields.bNoDDClr, 11, 10 );
             WriteBits( pLoc, rFields.nExecSize, 23,21 );
@@ -865,6 +899,7 @@ namespace GEN
        
         void WriteInstructionFields3Src( uint8* pLoc, const InstructionFields& rFields, Operations eOp )
         {
+           
             WriteBits( pLoc, rFields.dwOpcode, 7, 0 );
             WriteBit( pLoc, rFields.bMaskControl, 9 );
             WriteBits( pLoc, (rFields.bNoDDChk<<1)|rFields.bNoDDClr, 11, 10 );
@@ -903,7 +938,7 @@ namespace GEN
         }
 
 
-        static void DecodeRegNumAndType( RegisterFields& reg )
+        static void DecodeRegNumAndType2Src( RegisterFields& reg )
         {
             switch( reg.dwRegFile )
             {
@@ -920,6 +955,8 @@ namespace GEN
             }
         }
 
+        
+     
         static void DecodePredicationMode( InstructionFields& fields )
         {
             if( fields.bAlign16 )
@@ -966,7 +1003,7 @@ namespace GEN
                 }
             }
 
-            DecodeRegNumAndType(reg);
+            DecodeRegNumAndType2Src(reg);
         }
 
        
@@ -1032,7 +1069,7 @@ namespace GEN
                 }
             }
             
-            DecodeRegNumAndType(fields.Dest);
+            DecodeRegNumAndType2Src(fields.Dest);
 
             ReadSourceRegFields(fields.Src0,pIn+8, align1);
             ReadSourceRegFields(fields.Src1,pIn+12, align1);
@@ -1104,11 +1141,11 @@ namespace GEN
             fields.Src1.dwModifier = ReadBits(pIn,39,38);
             fields.Src2.dwModifier = ReadBits(pIn,41,40);
             
-            DWORD dwSrcType = ReadBits(pIn,43,42);
+            DWORD dwSrcType = DECODE_RegDataTypes3Src(ReadBits(pIn,43,42));
             fields.Src0.dwDataType = dwSrcType;
             fields.Src1.dwDataType = dwSrcType;
             fields.Src2.dwDataType = dwSrcType;
-            fields.Dest.dwDataType = ReadBits(pIn,45,44);
+            fields.Dest.dwDataType = DECODE_RegDataTypes3Src(ReadBits(pIn,45,44));
 
             fields.dwDestWriteMask = ReadBits(pIn,52,49);
   
@@ -1146,10 +1183,9 @@ namespace GEN
             fields.Dest.dwWidth   = 8;
 
             fields.nExecSize = DECODE_ExecSize(fields.nExecSize);
-            DecodeRegNumAndType(fields.Dest);
-            DecodeRegNumAndType(fields.Src0);
-            DecodeRegNumAndType(fields.Src1);
-            DecodeRegNumAndType(fields.Src2);
+            
+
+
             DecodePredicationMode(fields);
         }
       
@@ -1625,6 +1661,7 @@ namespace GEN
                     fields.nExecSize = _INTERNAL::Encode_ExecSize(it.GetExecSize());
                     fields.IMM32 = it.GetImmediate<uint32>();
                     fields.IMM64 = it.GetImmediate<uint64>();
+                    fields.nCondModifier = _INTERNAL::Encode_CondModifiers(it.GetConditionModifier());
                     _INTERNAL::FillDestRegFields( fields.Dest, it.GetDest() );
                     _INTERNAL::FillSourceRegFields( fields.Src0, it.GetSource0() );
                     _INTERNAL::WriteInstructionFields2Src(pOutputBytes, fields, rInst.GetOperation() );
@@ -1635,9 +1672,9 @@ namespace GEN
                     const BinaryInstruction& it = static_cast<const BinaryInstruction&> (rInst);
                     fields.dwOpcode  = _INTERNAL::Encode_Operations(rInst.GetOperation());
                     fields.nExecSize = _INTERNAL::Encode_ExecSize(it.GetExecSize());
+                    fields.nCondModifier = _INTERNAL::Encode_CondModifiers(it.GetConditionModifier());
                     fields.IMM32 = it.GetImmediate<uint32>();
                     fields.IMM64 = it.GetImmediate<uint64>();
-                 
                     _INTERNAL::FillDestRegFields( fields.Dest, it.GetDest() );
                     _INTERNAL::FillSourceRegFields( fields.Src0, it.GetSource0() );
                     _INTERNAL::FillSourceRegFields( fields.Src1, it.GetSource1() );
@@ -1663,12 +1700,11 @@ namespace GEN
                     const TernaryInstruction& it = static_cast<const TernaryInstruction&> (rInst);
                     fields.dwOpcode  = _INTERNAL::Encode_Operations(rInst.GetOperation());
                     fields.nExecSize = _INTERNAL::Encode_ExecSize(it.GetExecSize());
-                    _INTERNAL::FillDestRegFields( fields.Dest, it.GetDest() );
-                    _INTERNAL::FillSourceRegFields( fields.Src0, it.GetSource0() );
-                    _INTERNAL::FillSourceRegFields( fields.Src1, it.GetSource1() );
-                    _INTERNAL::FillSourceRegFields( fields.Src2, it.GetSource2() );
-                    
-                    // TODO: Three-source instruction encode/decode
+                    fields.nCondModifier = _INTERNAL::Encode_CondModifiers(it.GetConditionModifier());
+                    _INTERNAL::FillDestRegFields3Src( fields, it.GetDest() );
+                    _INTERNAL::FillSourceRegFields3Src( fields.Src0, it.GetSource0() );
+                    _INTERNAL::FillSourceRegFields3Src( fields.Src1, it.GetSource1() );
+                    _INTERNAL::FillSourceRegFields3Src( fields.Src2, it.GetSource2() );
                     
                     _INTERNAL::WriteInstructionFields3Src(pOutputBytes, fields, rInst.GetOperation() );
                 }
@@ -1708,7 +1744,7 @@ namespace GEN
                 {
                     const SendInstruction& it = static_cast<const SendInstruction&>( rInst );
                     fields.dwOpcode         = _INTERNAL::Encode_Operations(it.GetOperation());
-                    fields.nExecSize        = _INTERNAL::Encode_ExecSize(8);
+                    fields.nExecSize        = _INTERNAL::Encode_ExecSize(it.GetExecSize());
                     fields.nCondModifier    = _INTERNAL::Encode_SharedFunctions(it.GetRecipient());
                     fields.IMM32  = it.GetDescriptorIMM();
                     if( it.IsEOT() )

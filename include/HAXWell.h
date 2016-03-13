@@ -28,7 +28,7 @@ namespace HAXWell
     enum
     {
         MAX_DISPATCH_COUNT = 64, ///< Thread counts higher than this have led to instability
-        MAX_BUFFERS =   4,
+        MAX_BUFFERS =   6,
         BIND_TABLE_BASE = 0x38, // Shader storage buffers start at this bind table index
     };
 
@@ -41,9 +41,15 @@ namespace HAXWell
     void ReleaseBuffer( BufferHandle hBuffer );
 
     ShaderHandle CreateShader( const ShaderArgs& rShader );
+    ShaderHandle CreateGLSLShader( const char* pGLSL );
     void ReleaseShader( ShaderHandle hShader );
 
-
+    // Timer usage:
+    //   t = BeginTimer()
+    //    .. do stuff....
+    //   EndTimer(t)
+    //   ReadTimer(t) // t is deallocated
+    //
     TimerHandle BeginTimer();
     void EndTimer( TimerHandle hTimer );
     timer_t ReadTimer( TimerHandle hTimer );

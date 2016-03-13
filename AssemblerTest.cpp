@@ -175,6 +175,7 @@ pred(f1.0)
     fma(16) Fx0.f, Dx0.f, lengthSq0.f
     fma(16) Fy0.f, Dy0.f, lengthSq0.f
     fma(16) Fz0.f, Dz0.f, lengthSq0.f
+    add(16) Fx0.f, Fx0.f, BodyPair.f3<0,1,0>
 }
 pred(f1.1)
 {
@@ -323,7 +324,7 @@ add(16) VZ4.f, VZ4.f, Fz4.f
 add(16) VZ6.f, VZ6.f, Fz6.f
 
 // write velocities
-mul(16)  base.u, r0.u2<0,1,0>, 192 // base address for this thread's bodies
+mul(16)  base.u, r0.u2<0,1,0>, 256 // base address for this thread's bodies
 add(16)  addrx.u, base.u, OFFSETS.u  // x addresses for first 16-body group 
 add(16)  addry.u, base.u, 1          // x addresses for first 16-body group 
 add(16)  addrz.u, base.u, 2          // x addresses for first 16-body group 

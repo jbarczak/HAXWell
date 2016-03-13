@@ -8,7 +8,7 @@ namespace HAXWell
 
 
 void PrintISA( FILE* fp, HAXWell::Blob& blob );
-
+void PrintISA( FILE* fp, const void* pBytes, size_t nBytes );
 
 int GetLinearThreadID( size_t sr );
 
