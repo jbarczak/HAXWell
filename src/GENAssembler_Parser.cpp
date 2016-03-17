@@ -906,6 +906,8 @@ namespace _INTERNAL{
         OperationNode* pOperation = static_cast<OperationNode*>(pOp);
 
         Error( pOperation->LineNumber, "Unrecognized instruction");
+
+
         // TODO
         /*
            // ternaries
@@ -1001,7 +1003,7 @@ namespace _INTERNAL{
         // after the pre-amble is done, allocate registers for all 'reg' declarations
         //   We allow mixing of 'reg' and 'curbe' in the pre-amble, so we need to defer
         //  the assignment of 'reg' regs until all the curbes are known
-        size_t nRegNum = m_nCURBERegCount;
+        size_t nRegNum = m_nCURBERegCount+1;
         for( size_t i=0; i<m_NamedRegs.size(); i++ )
         {
             if( m_NamedRegs[i].reg.GetRegNumber() == 0 )

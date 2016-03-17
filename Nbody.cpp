@@ -86,6 +86,96 @@ const char* NBODYGLSL = GLSL(
     );
 
 
+#define SM_SIZE 256
+const char* NBODYGLSL_SM = GLSL(
+    
+    layout (local_size_x = 256) in;
+
+        layout (std430,binding=0)
+        buffer Output0
+        {
+           uint g_nBodies;
+           float g_TimeStep;
+           float g_GraviationConst;
+        };
+
+        layout (std430,binding=1)
+        buffer BodiesIn
+        {
+           vec4 g_PositionAndMass[];
+        };
+        layout (std430,binding=2)
+        buffer VelocitiesIn
+        {
+           vec4 g_Velocity[];
+        };
+
+        
+        layout (std430,binding=3)
+        buffer BodiesOut
+        {
+           vec4 g_PositionAndMassOut[];
+        };
+        layout (std430,binding=4)
+        buffer VelocitiesOut
+        {
+           vec4 g_VelocityOut[];
+        };
+
+        shared vec4 SHARED_Bodies[256];
+
+        void main() 
+        {
+            uint tid = gl_GlobalInvocationID.x;
+            uint tid_local = gl_LocalInvocationID.x;
+            
+            vec4 body  = g_PositionAndMass[tid];
+            vec3 force = vec3(0.f,0.f,0.f);
+
+            for( uint i=0; i<g_nBodies; i+= 256 )
+            {
+                // load a bunch of bodies into SM across the thread group
+                vec4 other = g_PositionAndMass[i+tid_local];
+                other.w = g_GraviationConst*other.w;
+                SHARED_Bodies[tid_local] = other;
+                memoryBarrierShared();
+
+                // now add up all the forces
+                for( uint j=0; j<256;j++ )
+                {
+                    if( (i+j) != tid )
+                    {
+                        vec4 otherBody = SHARED_Bodies[j];
+                        vec3 D = body.xyz - otherBody.xyz;
+
+                        // force = G*massi*massj * (D ) / length(D)^3
+                        // length(D)^3 is dot(D,D) * sqrt(dot(D,D))
+                        float lengthSq = dot( D, D );
+                        float lengthCubed = lengthSq * sqrt(lengthSq);
+
+                        float scale = (  otherBody.w) / lengthCubed;
+                        force += D*scale;
+                    }
+                }
+                memoryBarrierShared();
+
+            }
+
+            vec3 velocity = g_Velocity[tid].xyz;
+            vec3 accel    = force; // mass cancels out
+
+            velocity += accel * g_TimeStep;
+            body.xyz += velocity * g_TimeStep;
+
+            g_PositionAndMassOut[tid].xyz = body.xyz;
+            g_VelocityOut[tid].xyz = velocity.xyz;
+        }
+
+
+    );
+
+
+
 
 float Rnd()
 {
@@ -118,7 +208,7 @@ float* Nbody( Simulator& sim )
     float* pVelocities = new float[4*sim.nBodies];
     for( size_t i=0; i<nBodies; i++ )
     {
-        pPositions[4*i] = 100.0f*Rnd();
+        pPositions[4*i]   = 100.0f*Rnd();
         pPositions[4*i+1] = 100.0f*Rnd();
         pPositions[4*i+2] = 100.0f*Rnd();
         pPositions[4*i+3] = 0.5f + Rnd()*5.0f;
@@ -130,6 +220,7 @@ float* Nbody( Simulator& sim )
 
     }
     memset( pVelocities,0,sizeof(float)*4*nBodies );
+    
 
     HAXWell::BufferHandle hPositions[2] ={
         HAXWell::CreateBuffer( pPositions, 4*sizeof(float)*nBodies ),
@@ -172,19 +263,20 @@ float* Nbody( Simulator& sim )
 
         std::swap(hPositions[0],hPositions[1]);
         std::swap(hVelocities[0],hVelocities[1]);
+        HAXWell::Finish();// need a 'finish' in here, or else things go wrong in the Haxwell version.  Driver bug?
     }
 
     HAXWell::EndTimer(hTimer);
-    HAXWell::Finish(); // flush buffer creation
+    HAXWell::Finish(); // flush compute
     HAXWell::timer_t nTime = HAXWell::ReadTimer(hTimer);
 
-    printf("%u\n", nTime);
+    printf("%012u\n", nTime);
     delete[] pVelocities;
     delete[] pMassInit;
 
-    void* pResults = HAXWell::MapBuffer(hVelocities[0]);
+    void* pResults = HAXWell::MapBuffer(hPositions[0]);
     memcpy( pPositions, pResults, 4*sizeof(float)*nBodies );
-    HAXWell::UnmapBuffer(hVelocities[0]);
+    HAXWell::UnmapBuffer(hPositions[0]);
 
     HAXWell::ReleaseBuffer(hPositions[0]);
     HAXWell::ReleaseBuffer(hPositions[1]);
@@ -201,14 +293,12 @@ float* Nbody( Simulator& sim )
 
 
 
-
-
 static const char* NBODY_HAXWELL = STRINGIFY(
 
-curbe OFFSETS[2] = {{0,4,8,12,16,20,24,28},{32,36,40,44,48,52,56,60}}
+    curbe OFFSETS[2] = {{0,4,8,12,16,20,24,28},{32,36,40,44,48,52,56,60}}
 
 curbe INDICES[1] = {0,1,2,3,4,5,6,7}
-
+threads 64 // launch 64 HW threads at once
 
 reg globals
 reg i
@@ -234,7 +324,8 @@ reg Dz0 [2]
 reg Dz1 [2]
 reg lengthSq0 [2]
 reg lengthSq1 [2]
-reg tmp[2]
+reg length0[2]
+reg length1[2]
 reg BodyPair
 
 bind Globals        0x38  // {#bodies,timestep,gravitation}
@@ -252,7 +343,7 @@ begin:
 // Load blocks of body positions which this thread will process
 // Load velocities up front as well.  We've got plenty of regs and we know we'll eventually need them
 
-mul(16)  base.u, r0.u2<0,1,0>, 256        // base address for this thread's bodies (64 bodies * 4 dwords)
+mul(16)  base.u, r0.u1<0,1,0>, 256        // base address for this thread's bodies (64 bodies * 4 dwords)
 add(16)  addrx.u, base.u, OFFSETS.u     // x addresses for first 16-body group 
 add(16)  addry.u, addrx.u, 1            // y addresses for first 16-body group 
 add(16)  addrz.u, addrx.u, 2            // z addresses for first 16-body group 
@@ -311,7 +402,7 @@ mov(16) Fz6.f, 0.0f
 
 mov(1) f0.u, 0
 mov(1) f1.u, 0
-mov(8) i.u,  0    // 
+mov(8) i.u,  0    
 cmpge(1)(f0.0) null.u, i.u0<1,1,1>, globals.u0<1,1,1>
 jmpif(f0.0) write_out
 
@@ -319,7 +410,7 @@ jmpif(f0.0) write_out
 loop:
 
 
-mul(1) base.u, i.u, 4
+mul(8) base.u, i.u<0,1,0>, 4
 add(8) base.u, base.u<0,1,0>, INDICES.u
 add(1) i.u0 , i.u0<1,1,1>, 2
 send     DwordLoad8(PositionIn), BodyPair.f, base.u   
@@ -351,31 +442,28 @@ fma(16) lengthSq0.f, Dy0.f, Dy0.f
 fma(16) lengthSq1.f, Dy1.f, Dy1.f
 fma(16) lengthSq0.f, Dz0.f, Dz0.f
 fma(16) lengthSq1.f, Dz1.f, Dz1.f
-sqrt(16) tmp.f, lengthSq0.f
-mul(16) lengthSq0.f, lengthSq0.f, tmp.f
-sqrt(16) tmp.f, lengthSq1.f
-mul(16) lengthSq1.f, lengthSq1.f, tmp.f
-
+sqrt(16) length0.f, lengthSq0.f
+sqrt(16) length1.f, lengthSq1.f
 cmpgt(16)(f1.0) null.u, lengthSq0.f, 0.0f
 cmpgt(16)(f1.1) null.u, lengthSq1.f, 0.0f
 
+pred(f1.0){ mul(16) length0.f, length0.f, lengthSq0.f }
+pred(f1.1){ mul(16) length1.f, length1.f, lengthSq1.f }
+pred(f1.0){ rcp(16) length0.f, length0.f }
+pred(f1.1){ rcp(16) length1.f, length1.f }
+pred(f1.0){ mul(16) length0.f, length0.f, BodyPair.f3<0,1,0> }
+pred(f1.1){ mul(16) length1.f, length1.f, BodyPair.f7<0,1,0> }
+pred(f1.0){
+    fma(16) Fx0.f, Dx0.f, length0.f
+    fma(16) Fy0.f, Dy0.f, length0.f
+    fma(16) Fz0.f, Dz0.f, length0.f
+}
+pred(f1.1){
+    fma(16) Fx0.f, Dx1.f, length1.f
+    fma(16) Fy0.f, Dy1.f, length1.f
+    fma(16) Fz0.f, Dz1.f, length1.f
+}
 
-pred(f1.0)
-{
-    rcp(16) tmp.f, lengthSq0.f
-    mul(16) lengthSq0.f, tmp.f, BodyPair.f3<0,1,0> // body mass*G / length_cube
-    fma(16) Fx0.f, Dx0.f, lengthSq0.f
-    fma(16) Fy0.f, Dy0.f, lengthSq0.f
-    fma(16) Fz0.f, Dz0.f, lengthSq0.f
-}
-pred(f1.1)
-{
-    rcp(16) tmp.f, lengthSq1.f
-    mul(16) lengthSq1.f, tmp.f, BodyPair.f7<0,1,0> // body masses
-    fma(16) Fx0.f, Dx1.f, lengthSq1.f
-    fma(16) Fy0.f, Dy1.f, lengthSq1.f
-    fma(16) Fz0.f, Dz1.f, lengthSq1.f
-}
 
 // Bodies 16-32
 sub(16) Dx0.f, X2.f, BodyPair.f0<0,1,0>
@@ -390,28 +478,26 @@ fma(16) lengthSq0.f, Dy0.f, Dy0.f
 fma(16) lengthSq1.f, Dy1.f, Dy1.f
 fma(16) lengthSq0.f, Dz0.f, Dz0.f
 fma(16) lengthSq1.f, Dz1.f, Dz1.f
-sqrt(16) tmp.f, lengthSq0.f
-mul(16) lengthSq0.f, lengthSq0.f, tmp.f
-sqrt(16) tmp.f, lengthSq1.f
-mul(16) lengthSq1.f, lengthSq1.f, tmp.f
+sqrt(16) length0.f, lengthSq0.f
+sqrt(16) length1.f, lengthSq1.f
+cmpgt(16)(f1.0) null.u, lengthSq0.f, 0.0f
+cmpgt(16)(f1.1) null.u, lengthSq1.f, 0.0f
 
-cmpgt(16)(f1.0) null.f, lengthSq0.f, 0.0f
-cmpgt(16)(f1.1) null.f, lengthSq1.f, 0.0f
-pred(f1.0)
-{
-  rcp(16) tmp.f, lengthSq0.f
-  mul(16) lengthSq0.f, tmp.f, BodyPair.f3<0,1,0> // body masses
-  fma(16) Fx2.f, Dx0.f, lengthSq0.f
-  fma(16) Fy2.f, Dy0.f, lengthSq0.f
-  fma(16) Fz2.f, Dz0.f, lengthSq0.f
+pred(f1.0){ mul(16) length0.f, length0.f, lengthSq0.f }
+pred(f1.1){ mul(16) length1.f, length1.f, lengthSq1.f }
+pred(f1.0){ rcp(16) length0.f, length0.f }
+pred(f1.1){ rcp(16) length1.f, length1.f }
+pred(f1.0){ mul(16) length0.f, length0.f, BodyPair.f3<0,1,0> }
+pred(f1.1){ mul(16) length1.f, length1.f, BodyPair.f7<0,1,0> }
+pred(f1.0){
+    fma(16) Fx2.f, Dx0.f, length0.f
+    fma(16) Fy2.f, Dy0.f, length0.f
+    fma(16) Fz2.f, Dz0.f, length0.f
 }
-pred(f1.1)
-{
-  rcp(16) tmp.f, lengthSq1.f
-  mul(16) lengthSq1.f, tmp.f, BodyPair.f7<0,1,0> // body masses
-  fma(16) Fx2.f, Dx1.f, lengthSq1.f
-  fma(16) Fy2.f, Dy1.f, lengthSq1.f
-  fma(16) Fz2.f, Dz1.f, lengthSq1.f
+pred(f1.1){
+    fma(16) Fx2.f, Dx1.f, length1.f
+    fma(16) Fy2.f, Dy1.f, length1.f
+    fma(16) Fz2.f, Dz1.f, length1.f
 }
 
 // Bodies 32-48
@@ -427,27 +513,26 @@ fma(16) lengthSq0.f, Dy0.f, Dy0.f
 fma(16) lengthSq1.f, Dy1.f, Dy1.f
 fma(16) lengthSq0.f, Dz0.f, Dz0.f
 fma(16) lengthSq1.f, Dz1.f, Dz1.f
-sqrt(16) tmp.f, lengthSq0.f
-mul(16) lengthSq0.f, lengthSq0.f, tmp.f
-sqrt(16) tmp.f, lengthSq1.f
-mul(16) lengthSq1.f, lengthSq1.f, tmp.f
-cmpgt(16)(f1.0) null.f, lengthSq0.f, 0.0f
-cmpgt(16)(f1.1) null.f, lengthSq1.f, 0.0f
-pred(f1.0)
-{
-  rcp(16) tmp.f, lengthSq0.f
-  mul(16) lengthSq0.f, tmp.f, BodyPair.f3<0,1,0> // body masses
-  fma(16) Fx4.f, Dx0.f, lengthSq0.f
-  fma(16) Fy4.f, Dy0.f, lengthSq0.f
-  fma(16) Fz4.f, Dz0.f, lengthSq0.f
+sqrt(16) length0.f, lengthSq0.f
+sqrt(16) length1.f, lengthSq1.f
+cmpgt(16)(f1.0) null.u, lengthSq0.f, 0.0f
+cmpgt(16)(f1.1) null.u, lengthSq1.f, 0.0f
+
+pred(f1.0){ mul(16) length0.f, length0.f, lengthSq0.f }
+pred(f1.1){ mul(16) length1.f, length1.f, lengthSq1.f }
+pred(f1.0){ rcp(16) length0.f, length0.f }
+pred(f1.1){ rcp(16) length1.f, length1.f }
+pred(f1.0){ mul(16) length0.f, length0.f, BodyPair.f3<0,1,0> }
+pred(f1.1){ mul(16) length1.f, length1.f, BodyPair.f7<0,1,0> }
+pred(f1.0){
+    fma(16) Fx4.f, Dx0.f, length0.f
+    fma(16) Fy4.f, Dy0.f, length0.f
+    fma(16) Fz4.f, Dz0.f, length0.f
 }
-pred(f1.1)
-{
-  rcp(16) tmp.f, lengthSq1.f
-  mul(16) lengthSq1.f, tmp.f, BodyPair.f7<0,1,0> // body masses
-  fma(16) Fx4.f, Dx1.f, lengthSq1.f
-  fma(16) Fy4.f, Dy1.f, lengthSq1.f
-  fma(16) Fz4.f, Dz1.f, lengthSq1.f
+pred(f1.1){
+    fma(16) Fx4.f, Dx1.f, length1.f
+    fma(16) Fy4.f, Dy1.f, length1.f
+    fma(16) Fz4.f, Dz1.f, length1.f
 }
 
 // Bodies 48-64
@@ -463,27 +548,26 @@ fma(16) lengthSq0.f, Dy0.f, Dy0.f
 fma(16) lengthSq1.f, Dy1.f, Dy1.f
 fma(16) lengthSq0.f, Dz0.f, Dz0.f
 fma(16) lengthSq1.f, Dz1.f, Dz1.f
-sqrt(16) tmp.f, lengthSq0.f
-mul(16) lengthSq0.f, lengthSq0.f, tmp.f
-sqrt(16) tmp.f, lengthSq1.f
-mul(16) lengthSq1.f, lengthSq1.f, tmp.f
-cmpgt(16)(f1.0) null.f, lengthSq0.f, 0.0f
-cmpgt(16)(f1.1) null.f, lengthSq1.f, 0.0f
-pred(f1.0)                   
-{
-  rcp(16) tmp.f, lengthSq0.f
-  mul(16) lengthSq0.f, tmp.f, BodyPair.f3<0,1,0> // body masses
-  fma(16) Fx6.f, Dx0.f, lengthSq0.f
-  fma(16) Fy6.f, Dy0.f, lengthSq0.f
-  fma(16) Fz6.f, Dz0.f, lengthSq0.f
+sqrt(16) length0.f, lengthSq0.f
+sqrt(16) length1.f, lengthSq1.f
+cmpgt(16)(f1.0) null.u, lengthSq0.f, 0.0f
+cmpgt(16)(f1.1) null.u, lengthSq1.f, 0.0f
+
+pred(f1.0){ mul(16) length0.f, length0.f, lengthSq0.f }
+pred(f1.1){ mul(16) length1.f, length1.f, lengthSq1.f }
+pred(f1.0){ rcp(16) length0.f, length0.f }
+pred(f1.1){ rcp(16) length1.f, length1.f }
+pred(f1.0){ mul(16) length0.f, length0.f, BodyPair.f3<0,1,0> }
+pred(f1.1){ mul(16) length1.f, length1.f, BodyPair.f7<0,1,0> }
+pred(f1.0){
+    fma(16) Fx6.f, Dx0.f, length0.f
+    fma(16) Fy6.f, Dy0.f, length0.f
+    fma(16) Fz6.f, Dz0.f, length0.f
 }
-pred(f1.1)
-{
-  rcp(16) tmp.f, lengthSq1.f
-  mul(16) lengthSq1.f, tmp.f, BodyPair.f7<0,1,0> // body masses
-  fma(16) Fx6.f, Dx1.f, lengthSq1.f
-  fma(16) Fy6.f, Dy1.f, lengthSq1.f
-  fma(16) Fz6.f, Dz1.f, lengthSq1.f
+pred(f1.1){
+    fma(16) Fx6.f, Dx1.f, length1.f
+    fma(16) Fy6.f, Dy1.f, length1.f
+    fma(16) Fz6.f, Dz1.f, length1.f
 }
 
 
@@ -522,7 +606,7 @@ add(16) VZ6.f, VZ6.f, Fz6.f
 
 
 // write velocities
-mul(16)  base.u, r0.u2<0,1,0>, 256 // base address for this thread's bodies
+mul(16)  base.u, r0.u1<0,1,0>, 256 // base address for this thread's bodies
 add(16)  addrx.u, base.u, OFFSETS.u  // x addresses for first 16-body group 
 add(16)  addry.u, addrx.u, 1         // y addresses for first 16-body group 
 add(16)  addrz.u, addrx.u, 2         // z addresses for first 16-body group 
@@ -590,7 +674,7 @@ add(16) Z6.f, Z6.f, VZ6.f
  
 
 // write positions
-mul(16)  base.u, r0.u2<0,1,0>, 256    // base address for this thread's bodies
+mul(16)  base.u, r0.u1<0,1,0>, 256    // base address for this thread's bodies
 add(16)  addrx.u, base.u, OFFSETS.u  // x addresses for first 16-body group 
 add(16)  addry.u, addrx.u, 1          // y addresses for first 16-body group 
 add(16)  addrz.u, addrx.u, 2          // z addresses for first 16-body group 
@@ -631,34 +715,40 @@ send     DwordStore16(PositionOut), null.u, addrz.u
 
 end
 
-
     );
 
 
 
-
+// even:  42/96
+// odd: 52/106/10 -> result first buffer
 
 
 void Nbody()
 {
     
-    HAXWell::Blob blob;
-    HAXWell::RipIsaFromGLSL( blob, NBODYGLSL );
-    PrintISA(stdout, blob );
+ //   HAXWell::Blob blob;
+ //   HAXWell::RipIsaFromGLSL( blob, NBODYGLSL );
+ //   PrintISA(stdout, blob );
     
     
     Simulator sim;
     sim.hKernel = HAXWell::CreateGLSLShader( NBODYGLSL );
     sim.nBodiesPerThreadGroup = 16;
-    sim.nBodies = 64;
+    sim.nBodies = 64*256;
     sim.dt = 1.0f/10.0f;
-    sim.nSteps = 101;
-    sim.GraviationalConstant = 10.01f;
+    sim.nSteps = 33;
+    sim.GraviationalConstant = 10.01f; // whatever...
    
   
     float* pGLSL = Nbody(sim);
     HAXWell::ReleaseShader(sim.hKernel);
-
+    
+    sim.hKernel = HAXWell::CreateGLSLShader( NBODYGLSL_SM );
+    sim.nBodiesPerThreadGroup = SM_SIZE;
+  
+    float* pGLSLSM = Nbody(sim);
+    HAXWell::ReleaseShader(sim.hKernel);
+    
 
     class Printer : public GEN::IPrinter{
     public:
@@ -684,14 +774,21 @@ void Nbody()
         args.pIsa = program.GetIsa();
 
         sim.hKernel = HAXWell::CreateShader( args );
-        sim.nBodiesPerThreadGroup = 64/program.GetThreadsPerDispatch();
+        sim.nBodiesPerThreadGroup = 64*program.GetThreadsPerDispatch();
 
-//        PrintISA( stdout,args.pIsa, args.nIsaLength);
+  //      PrintISA( stdout,args.pIsa, args.nIsaLength);
         float* pHSW = Nbody(sim);
         
+        /*
         for( size_t i=0; i<4*sim.nBodies; i+= 4 )
-           printf( "%f,%f,%f -- %f,%f,%f\n", pGLSL[i],pGLSL[i+1],pGLSL[i+2], 
-                                             pHSW[i], pHSW[i+1],pHSW[i+2] );
+        {
+            float dx = (pGLSL[i]-pGLSLSM[i])/pGLSL[i];
+           if( fabs(dx) > 0.1 )
+               printf("foo(%u) %f, %f\n", i/4, pGLSL[i], pGLSLSM[i]);
+        }*/
+   //  for( size_t i=0; i<4*sim.nBodies; i+= 4 )
+   //     printf( "%f,%f,%f -- %f,%f,%f\n", pGLSL[i],pGLSL[i+1],pGLSL[i+2], 
+   //                                       pHSW[i], pHSW[i+1],pHSW[i+2] );
         
    }
 
