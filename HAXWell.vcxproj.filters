@@ -76,6 +76,8 @@
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="AssemblerTest.cpp" />
+    <ClCompile Include="BCCompress.cpp" />
+    <ClCompile Include="BlockMinMax.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="src\GENAssembler_Bison.y">

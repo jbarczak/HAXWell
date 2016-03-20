@@ -79,6 +79,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="AssemblerTest.cpp" />
+    <ClCompile Include="BCCompress.cpp" />
+    <ClCompile Include="BlockMinMax.cpp" />
     <ClCompile Include="BlockReadCost.cpp" />
     <ClCompile Include="BlockVsScatterReads.cpp" />
     <ClCompile Include="Nbody.cpp" />

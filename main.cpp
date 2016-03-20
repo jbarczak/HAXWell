@@ -20,8 +20,9 @@ void Nbody();
 
 
 void AssemblerTest();
+void BlockCompress();
 
-
+void BlockMinMax();
 
 int main( int argc, char* argv[] )
 {
@@ -60,7 +61,8 @@ int main( int argc, char* argv[] )
       InstructionIssueTest(1,16); 
       */
    
-    Nbody();
+    //Nbody();
+    BlockMinMax();
     
    // AssemblerTest();
 
