@@ -61,8 +61,8 @@ int main( int argc, char* argv[] )
       InstructionIssueTest(1,16); 
       */
    
-    //Nbody();
-    BlockMinMax();
+    Nbody();
+    //BlockMinMax();
     
    // AssemblerTest();
 

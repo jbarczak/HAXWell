@@ -565,6 +565,8 @@ namespace GEN
         void SetFlagReference( const FlagReference& rFlag ) { m_Flags = rFlag; }
         void SetPredicate( Predicate p ) { m_Predicate = p; }
         
+        size_t GetExecSize() const { return m_nExecSize; }
+        
     protected:
         Instruction( InstructionClass e ) 
             : m_eClass(e),
@@ -872,6 +874,8 @@ namespace GEN
     SendInstruction DWordScatteredRead_SIMD16( uint32 nBindTableIndex, RegReference nAddress, RegReference nData );
     SendInstruction DWordScatteredWrite_SIMD8( uint32 nBindTableIndex, RegReference address, RegReference writeCommit );
     SendInstruction DWordScatteredWrite_SIMD16( uint32 nBindTableIndex, RegReference nAddress, RegReference writeCommit );
+ 
+    SendInstruction UntypedWrite_SIMD16x2( uint32 nBindTableIndex, RegReference nAddress, RegReference writeCommit );
  
     inline SendInstruction DWordScatteredReadSIMD8( uint32 nBindTableIndex, uint32 nAddress, uint32 nData )
     {

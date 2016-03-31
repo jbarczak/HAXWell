@@ -20,3 +20,5 @@ void GetEULocalTimes(  const unsigned int* pStateRegs,
                        size_t nThreadStride, size_t nThreads,
                        unsigned __int64* pLocalStartTimes,
                        unsigned __int64* pLocalEndTimes );
+
+void CountOps( size_t nIsaLength, const unsigned char* pIsa, unsigned int* pALU, unsigned int* pSend );

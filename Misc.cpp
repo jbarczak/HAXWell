@@ -4,6 +4,7 @@
 #include "Misc.h"
 #include "GENCoder.h"
 #include "GENDisassembler.h"
+#include "GENIsa.h"
 #include <map>
 
 void PrintISA( FILE* fp, HAXWell::Blob& blob )
@@ -110,4 +111,32 @@ void GetEULocalTimes(  const unsigned int* pStateRegs,
         pLocalStartTimes[i] = (*pEUStartTime) - TimeMap[ GetLinearThreadID(*pState)/7 ].Min;
         pLocalEndTimes[i]   = (*pEUEndTime) - TimeMap[ GetLinearThreadID(*pState)/7 ].Min;
     }
+}
+
+
+void CountOps( size_t nIsaLength, const unsigned char* pIsa, unsigned int* pALU, unsigned int* pSend )
+{
+    *pSend = 0;
+    *pALU = 0;
+     GEN::Decoder dec;
+    for( size_t i=0; i<nIsaLength; )
+    {
+        GEN::Instruction op;
+        i += dec.Decode( &op, pIsa + i );
+
+        if( op.GetClass() == GEN::IC_SEND )
+        {
+            (*pSend)++;
+        }
+        else if( op.GetClass() == GEN::IC_MATH ||
+                 op.GetClass() == GEN::IC_BINARY ||
+                 op.GetClass() == GEN::IC_TERNARY ||
+                 op.GetClass() == GEN::IC_BINARY )
+        {
+            
+            (*pALU) += op.GetExecSize();
+        }
+
+    }
+    
 }

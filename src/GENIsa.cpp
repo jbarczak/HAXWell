@@ -251,6 +251,22 @@ namespace GEN
         return write;
     }
    
+    SendInstruction UntypedWrite_SIMD16x2( uint32 nBindTableIndex, GEN::RegReference addr, GEN::RegReference writeCommit )
+    {
+        uint32 dwDescriptor = 0;
+        dwDescriptor  = (0x6<<25); // message length (6 gpr)
+        dwDescriptor |= (0<<20);   // response length (0 gpr)
+        dwDescriptor |= 0x9<<14;   // message type (untyped surface write)
+        dwDescriptor |= 0x1C<<8;   // SIMD16 untyped write message with A,B channels excluded
+        dwDescriptor |=  (nBindTableIndex&0xff);
+
+        
+        SendInstruction write( 16,SFID_DP_DC1, dwDescriptor,
+                               DestOperand( DT_U32, RegisterRegion(writeCommit,8,8,1)),
+                                SourceOperand( DT_U32,  RegisterRegion( addr,8,8,1)) );
+        return write;
+    }
+   
 
     BinaryInstruction DoMath( uint32 nExecSize, Operations eOp, DataTypes eType, uint32 nDstReg, uint32 nSrc0, uint32 nSrc1 )
     {

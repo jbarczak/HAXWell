@@ -949,6 +949,10 @@ namespace _INTERNAL{
         {
             m_Instructions.push_back( GEN::DWordScatteredWrite_SIMD16( pBind->bind, Dst1Reg, Dst0Reg ) );
         }
+        else if( strcmp( msg.fields.ID, "UntypedWrite16x2" ) == 0 )
+        {
+            m_Instructions.push_back( GEN::UntypedWrite_SIMD16x2( pBind->bind, Dst1Reg, Dst0Reg ) );
+        }
         else
         {
             Error(msg.LineNumber, "Unknown message");
