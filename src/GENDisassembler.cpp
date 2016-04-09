@@ -275,6 +275,8 @@ namespace GEN
             }
         }
 
+        static const bool VERBOSE_SEND = false;
+
         void DisassembleOp( IPrinter& printer, const Instruction& op )
         {
             char Src0[64];
@@ -291,24 +293,12 @@ namespace GEN
                     FormatDest(Dst,rInst.GetDest(), 0 );
                     FormatSource(Src0,rInst.GetSource(),rInst);
 
-                    if( rInst.IsDescriptorInRegister() )
-                    {
-                        Printf( printer, OPCODE_FORMAT, GEN::OperationToString(op.GetOperation()) );
-                        Printf(printer, "%16s, %16s  dest=%s ", Dst, Src0, GEN::SharedFunctionToString(rInst.GetRecipient()));
-
-                        Printf(printer," desc=REG");
-                    }
-                    else
+                    if( !VERBOSE_SEND )
                     {
                         uint32 nDescriptor = rInst.GetDescriptorIMM();
                         
-                        Printf( printer, OPCODE_FORMAT "%16s, %16s\n" , GEN::OperationToString(op.GetOperation()),
-                               Dst, Src0 );
-                            
+                        char Message[64];
 
-                        Printf(printer, "          desc=0x%08x dest=%s\n", nDescriptor, GEN::SharedFunctionToString(rInst.GetRecipient()));
-                        Printf(printer, "          len=%u  response=%u\n", rInst.GetMessageLengthFromDescriptor(), rInst.GetResponseLengthFromDescriptor() );
-                      
 
                         switch( rInst.GetRecipient() )
                         {
@@ -321,16 +311,16 @@ namespace GEN
                                 uint32 nControl = (nDescriptor>>8)&0x3f;
                                 switch( nMsgType )
                                 {
-                                case 0x0: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "OWordBlockRead",nControl, nBindTable); break;
-                                case 0x1: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "OWordBlockReadU",nControl,nBindTable); break;
-                                case 0x2: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "OWordBlockReadx2",nControl,nBindTable); break;
-                                case 0x3: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "DwordScatterRead",nControl,nBindTable); break;
-                                case 0x4: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "ByteScatterRead",nControl,nBindTable); break;
-                                case 0x7: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "MemFence",nControl,nBindTable); break;
-                                case 0x8: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "OWordBlockWrite",nControl,nBindTable); break;
-                                case 0xA: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "OWordBlockWritex2",nControl,nBindTable); break;
-                                case 0xB: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "DwordScatterWrite",nControl,nBindTable); break;
-                                case 0xC: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "ByteScatterWrite",nControl,nBindTable); break;
+                                case 0x0: sprintf( Message, "OWordBlockRead(%u)",      nBindTable); break;
+                                case 0x1: sprintf( Message, "OWordBlockReadU(%u)",     nBindTable); break;
+                                case 0x2: sprintf( Message, "OWordBlockReadx2(%u)",    nBindTable); break;
+                                case 0x3: sprintf( Message, "DwordScatterRead(%u)",    nBindTable); break;
+                                case 0x4: sprintf( Message, "ByteScatterRead(%u)",     nBindTable); break;
+                                case 0x7: sprintf( Message, "MemFence(%u)",            nBindTable); break;
+                                case 0x8: sprintf( Message, "OWordBlockWrite(%u)",     nBindTable); break;
+                                case 0xA: sprintf( Message, "OWordBlockWritex2(%u)",   nBindTable); break;
+                                case 0xB: sprintf( Message, "DwordScatterWrite(%u)",   nBindTable); break;
+                                case 0xC: sprintf( Message, "ByteScatterWrite(%u)",    nBindTable); break;
                                 }                      
                             }                          
                             break;
@@ -341,33 +331,112 @@ namespace GEN
                                 uint32 nControl = (nDescriptor>>8)&0x3f;
                                 switch( nMsgType )
                                 {
-                                case 0x1: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "UntypedRead",nControl, nBindTable); break;
-                                case 0x2: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "UntypedAtomic",nControl,nBindTable); break;
-                                case 0x3: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "UntypedAtomic4x2",nControl,nBindTable); break;
-                                case 0x4: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "MediaBlockRead",nControl,nBindTable); break;
-                                case 0x5: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "TypedRead",nControl,nBindTable); break;
-                                case 0x6: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "TypedAtomic",nControl,nBindTable); break;
-                                case 0x7: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "TypedAtomic4x2",nControl,nBindTable); break;
-                                case 0x9: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "UntypedWrite",nControl,nBindTable); break;
-                                case 0xA: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "MediaBlockWrite",nControl,nBindTable); break;
-                                case 0xB: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "AtomicCounterOp",nControl,nBindTable); break;
-                                case 0xC: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "AtomicCounterOp4x2",nControl,nBindTable); break;
-                                case 0xD: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "TypedWrite",nControl,nBindTable); break;
+                                case 0x1: sprintf( Message, "UntypedRead(%u)",          nBindTable); break;
+                                case 0x2: sprintf( Message, "UntypedAtomic(%u)",        nBindTable); break;
+                                case 0x3: sprintf( Message, "UntypedAtomic4x2(%u)",     nBindTable); break;
+                                case 0x4: sprintf( Message, "MediaBlockRead(%u)",       nBindTable); break;
+                                case 0x5: sprintf( Message, "TypedRead(%u)",            nBindTable); break;
+                                case 0x6: sprintf( Message, "TypedAtomic(%u)",          nBindTable); break;
+                                case 0x7: sprintf( Message, "TypedAtomic4x2(%u)",       nBindTable); break;
+                                case 0x9: sprintf( Message, "UntypedWrite(%u)",         nBindTable); break;
+                                case 0xA: sprintf( Message, "MediaBlockWrite(%u)",      nBindTable); break;
+                                case 0xB: sprintf( Message, "AtomicCounterOp(%u)",      nBindTable); break;
+                                case 0xC: sprintf( Message, "AtomicCounterOp4x2(%u)",   nBindTable); break;
+                                case 0xD: sprintf( Message, "TypedWrite(%u)",           nBindTable); break;
                                 }
                             
                             }
                             break;
 
                         default:
-                            ;
+                            sprintf( Message, "desc=0x%08x dst=%s", nDescriptor,GEN::SharedFunctionToString(rInst.GetRecipient()) );
                         }
 
-                        if( rInst.IsEOT() )
+
+                        
+                        Printf( printer, OPCODE_FORMAT "(%u) %s %16s, %16s" , GEN::OperationToString(op.GetOperation()),
+                                op.GetExecSize(), Message, Dst, Src0 );
+                            
+                    }
+                    else
+                    {
+                        if( rInst.IsDescriptorInRegister() )
                         {
-                            Printf(printer, "EOT");
+                            Printf( printer, OPCODE_FORMAT, GEN::OperationToString(op.GetOperation()) );
+                            Printf(printer, "%16s, %16s  dest=%s ", Dst, Src0, GEN::SharedFunctionToString(rInst.GetRecipient()));
+
+                            Printf(printer," desc=REG");
+                        }
+                        else
+                        {
+                            uint32 nDescriptor = rInst.GetDescriptorIMM();
+                        
+                            Printf( printer, OPCODE_FORMAT "%16s, %16s\n" , GEN::OperationToString(op.GetOperation()),
+                                   Dst, Src0 );
+                            
+
+                            Printf(printer, "          desc=0x%08x dest=%s\n", nDescriptor, GEN::SharedFunctionToString(rInst.GetRecipient()));
+                            Printf(printer, "          len=%u  response=%u\n", rInst.GetMessageLengthFromDescriptor(), rInst.GetResponseLengthFromDescriptor() );
+                      
+
+                            switch( rInst.GetRecipient() )
+                            {
+                            case SFID_DP_DC0:
+                                {
+                                    // TODO: Should probably abstract this
+                                    //  into a message class
+                                    uint32 nMsgType = (nDescriptor>>14)&0xf;
+                                    uint32 nBindTable = nDescriptor&0xff;
+                                    uint32 nControl = (nDescriptor>>8)&0x3f;
+                                    switch( nMsgType )
+                                    {
+                                    case 0x0: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "OWordBlockRead",nControl, nBindTable); break;
+                                    case 0x1: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "OWordBlockReadU",nControl,nBindTable); break;
+                                    case 0x2: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "OWordBlockReadx2",nControl,nBindTable); break;
+                                    case 0x3: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "DwordScatterRead",nControl,nBindTable); break;
+                                    case 0x4: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "ByteScatterRead",nControl,nBindTable); break;
+                                    case 0x7: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "MemFence",nControl,nBindTable); break;
+                                    case 0x8: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "OWordBlockWrite",nControl,nBindTable); break;
+                                    case 0xA: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "OWordBlockWritex2",nControl,nBindTable); break;
+                                    case 0xB: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "DwordScatterWrite",nControl,nBindTable); break;
+                                    case 0xC: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "ByteScatterWrite",nControl,nBindTable); break;
+                                    }                      
+                                }                          
+                                break;
+                            case SFID_DP_DC1:
+                                {
+                                    uint32 nMsgType = (nDescriptor>>14)&0xf;
+                                    uint32 nBindTable = nDescriptor&0xff;
+                                    uint32 nControl = (nDescriptor>>8)&0x3f;
+                                    switch( nMsgType )
+                                    {
+                                    case 0x1: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "UntypedRead",nControl, nBindTable); break;
+                                    case 0x2: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "UntypedAtomic",nControl,nBindTable); break;
+                                    case 0x3: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "UntypedAtomic4x2",nControl,nBindTable); break;
+                                    case 0x4: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "MediaBlockRead",nControl,nBindTable); break;
+                                    case 0x5: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "TypedRead",nControl,nBindTable); break;
+                                    case 0x6: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "TypedAtomic",nControl,nBindTable); break;
+                                    case 0x7: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "TypedAtomic4x2",nControl,nBindTable); break;
+                                    case 0x9: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "UntypedWrite",nControl,nBindTable); break;
+                                    case 0xA: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "MediaBlockWrite",nControl,nBindTable); break;
+                                    case 0xB: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "AtomicCounterOp",nControl,nBindTable); break;
+                                    case 0xC: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "AtomicCounterOp4x2",nControl,nBindTable); break;
+                                    case 0xD: Printf(printer,"          %s" " ctl=0x%x bind=0x%02x", "TypedWrite",nControl,nBindTable); break;
+                                    }
+                            
+                                }
+                                break;
+
+                            default:
+                                ;
+                            }
+
+                            if( rInst.IsEOT() )
+                            {
+                                Printf(printer, "EOT");
+                            }
                         }
                     }
-
 
                 }
                 break;
@@ -555,10 +624,11 @@ namespace GEN
                 return false;
             }
 
-            if( nLength == 8 )
-                _INTERNAL::Printf(printer, "c ");
-            else
-                _INTERNAL::Printf(printer, "n ");
+
+            //if( nLength == 8 )
+            //    _INTERNAL::Printf(printer, "c ");
+            //else
+            //    _INTERNAL::Printf(printer, "n ");
 
             _INTERNAL::DisassembleOp( printer, op );
             

@@ -199,7 +199,7 @@ max(16) tmax2.f, tmax2.f, tmax6.f
 //   
 //  Given:  reg0(0,1,2,3,4,5,6,7)  and reg1(8,9,10,11,12,13,14,15)
 //
-//   min reg0.f<4,2,2> reg0.f1<4,2,2> does:   min( {0,2,4,6,8,10,12,14} , {1,3,5,7,9,11,13,15} )
+//   min(8) reg0.f<4,2,2> reg0.f1<4,2,2> does:   min( {0,2,4,6,8,10,12,14} , {1,3,5,7,9,11,13,15} )
 // 
 
 min(8) pmin0.f, tmin0.f<4,2,2>, tmin0.f1<4,2,2> 
@@ -392,12 +392,18 @@ static void Test( int N, int nThreads, HAXWell::ShaderHandle hShader  )
     HAXWell::BufferHandle pBuffers[3] = {
         hGlobals,hImage,hBlocks
     };
-    HAXWell::TimerHandle hTimer = HAXWell::BeginTimer();
-    HAXWell::DispatchShader( hShader, pBuffers, 3, nThreads );
-    HAXWell::EndTimer(hTimer);
-    HAXWell::Finish();
-   
-    printf("%08u\n", HAXWell::ReadTimer(hTimer) );
+    int REPEATS=20;
+    size_t time=0;
+    for( size_t i=0; i<REPEATS; i++ )
+    {
+        HAXWell::TimerHandle hTimer = HAXWell::BeginTimer();
+        HAXWell::DispatchShader( hShader, pBuffers, 3, nThreads );
+        HAXWell::EndTimer(hTimer);
+        HAXWell::Finish();
+        time += HAXWell::ReadTimer(hTimer);
+    }
+
+    printf("%08u\n", time/REPEATS );
    
     // check it
     float* pOut = (float*) HAXWell::MapBuffer(hBlocks);
@@ -487,6 +493,27 @@ void BlockMinMax()
         HAXWell::ShaderHandle hShader = HAXWell::CreateShader( args );
         
         Test( WIDTH, NUM_BLOCKS/16, hShader );
+        
+    }
+
+    if( program.Assemble( &encoder, BLOCKMINMAX_HXW, &pr ) )
+    {
+        HAXWell::ShaderArgs args;
+        args.nCURBEAllocsPerThread = program.GetCURBERegCount();
+        args.nDispatchThreadCount = program.GetThreadsPerDispatch();
+        args.nSIMDMode = 16;
+        args.nIsaLength = program.GetIsaLengthInBytes();
+        args.pCURBE = program.GetCURBE();
+        args.pIsa = program.GetIsa();
+
+        unsigned int nALU, nSend;
+        CountOps( program.GetIsaLengthInBytes(),(const unsigned char*) program.GetIsa(), &nALU, &nSend );
+        printf("%u/%u\n", nALU, nSend );
+
+
+        HAXWell::ShaderHandle hShader = HAXWell::CreateShader( args );
+        
+        Test( WIDTH, NUM_BLOCKS/8, hShader );
         
     }
 

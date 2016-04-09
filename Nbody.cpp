@@ -117,7 +117,7 @@ const char* NBODYGLSL_SM = GLSL(
            vec4 g_PositionAndMassOut[];
         };
         layout (std430,binding=4)
-        buffer VelocitiesOut
+        buffer VelocitiesOut 
         {
            vec4 g_VelocityOut[];
         };
@@ -263,7 +263,7 @@ float* Nbody( Simulator& sim )
 
         std::swap(hPositions[0],hPositions[1]);
         std::swap(hVelocities[0],hVelocities[1]);
-        HAXWell::Finish();// need a 'finish' in here, or else things go wrong in the Haxwell version.  Driver bug?
+        HAXWell::Finish();// need a 'finish' in here, or else Haxwell version sporadically crashes
     }
 
     HAXWell::EndTimer(hTimer);
@@ -736,18 +736,13 @@ void Nbody()
     sim.nBodiesPerThreadGroup = 16;
     sim.nBodies = 64*256;
     sim.dt = 1.0f/10.0f;
-    sim.nSteps = 33;
+    sim.nSteps = 32;
     sim.GraviationalConstant = 10.01f; // whatever...
    
   
     float* pGLSL = Nbody(sim);
     HAXWell::ReleaseShader(sim.hKernel);
-    
-    sim.hKernel = HAXWell::CreateGLSLShader( NBODYGLSL_SM );
-    sim.nBodiesPerThreadGroup = SM_SIZE;
-  
-    float* pGLSLSM = Nbody(sim);
-    HAXWell::ReleaseShader(sim.hKernel);
+   
     
 
     class Printer : public GEN::IPrinter{
@@ -779,13 +774,17 @@ void Nbody()
   //      PrintISA( stdout,args.pIsa, args.nIsaLength);
         float* pHSW = Nbody(sim);
         
+        
+        // NOTE: There are differences in the results, but I suspect
+        // that they are down to precision differences
         /*
         for( size_t i=0; i<4*sim.nBodies; i+= 4 )
         {
             float dx = (pGLSL[i]-pGLSLSM[i])/pGLSL[i];
            if( fabs(dx) > 0.1 )
                printf("foo(%u) %f, %f\n", i/4, pGLSL[i], pGLSLSM[i]);
-        }*/
+        }
+        */
    //  for( size_t i=0; i<4*sim.nBodies; i+= 4 )
    //     printf( "%f,%f,%f -- %f,%f,%f\n", pGLSL[i],pGLSL[i+1],pGLSL[i+2], 
    //                                       pHSW[i], pHSW[i+1],pHSW[i+2] );
@@ -793,4 +792,11 @@ void Nbody()
    }
 
 
+
+    
+    sim.hKernel = HAXWell::CreateGLSLShader( NBODYGLSL_SM );
+    sim.nBodiesPerThreadGroup = SM_SIZE;
+  
+    float* pGLSLSM = Nbody(sim);
+    HAXWell::ReleaseShader(sim.hKernel);
 }
