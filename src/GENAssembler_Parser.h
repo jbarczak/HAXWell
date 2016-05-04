@@ -53,7 +53,7 @@ namespace GEN
             // methods below are "private" but are called by generated flex/bison code
             //  and this is easier with trying to mess with friendship and namespaces...
      
-
+            void ErrorF( size_t nLine, const char* msg, ... );
             void Error( size_t nLine, const char* msg );
             size_t Read( char* buff, size_t max_size );
 
@@ -90,7 +90,7 @@ namespace GEN
             void Send( TokenStruct& msg, TokenStruct& bind, ParseNode* pDst0, ParseNode* pDst1 );
             
             void Jmp( TokenStruct& label );
-            void JmpIf( TokenStruct& label, ParseNode* pFlagRef );
+            void JmpIf( TokenStruct& label, ParseNode* pFlagRef, bool bInvert );
             
             void BeginPredBlock( ParseNode* pFlagRef );
             void EndPredBlock();
@@ -112,6 +112,7 @@ namespace GEN
             struct Jump
             {
                 ParseNode* pFlagRef; 
+                bool bInvertPredicate;
                 size_t nLine;
                 size_t nJumpIndex;
                 const char* pLabelName;

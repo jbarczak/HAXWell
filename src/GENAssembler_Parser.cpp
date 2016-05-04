@@ -4,6 +4,7 @@
 #include "GENAssembler_Parser.h"
 
 #include "GENIsa.h"
+#include <stdarg.h>
 
 int yylex_init_extra(GEN::Assembler::_INTERNAL::Parser* yy_user_defined,yyscan_t* ptr_yy_globals );
 int yyparse( GEN::Assembler::_INTERNAL::Parser* pParser );
@@ -66,7 +67,7 @@ namespace _INTERNAL{
 
     struct OperationNode : public ParseNode
     {
-        OperationNode( size_t line ) : ParseNode(line){}
+        OperationNode( size_t line ) : ParseNode(line), pFlagRef(0){}
         const char* pName;
         size_t nExecSize;
         FlagReferenceNode* pFlagRef;
@@ -98,6 +99,35 @@ namespace _INTERNAL{
             delete it;
     }
 
+    void Parser::ErrorF( size_t nLine, const char* msg, ... )
+    {
+        m_bError = true;
+        if( !m_pErrorPrinter )
+            return;
+
+        va_list vl;
+        va_start(vl,msg);
+
+        char scratch[2048];
+        char* p = scratch;
+
+        int n = _vscprintf( msg, vl );
+        if( n+1 > sizeof(scratch) )
+            p = (char*) malloc( n+1 );
+            
+        vsprintf(p,msg,vl);
+
+        char line[64];
+        sprintf(line, "Line: %u:  ", nLine );
+        m_pErrorPrinter->Push(line);
+        m_pErrorPrinter->Push(p);
+
+        if( p != scratch )
+            free(p);
+
+        va_end(vl);
+        
+    }
 
     void Parser::Error( size_t nLine, const char* msg)
     {
@@ -455,7 +485,7 @@ namespace _INTERNAL{
             return true;
         }
        
-        Error( rToken.LineNumber, "Unknown register");
+        ErrorF( rToken.LineNumber, "Unknown register %s", pName );
         return false;
     }
     
@@ -721,7 +751,7 @@ namespace _INTERNAL{
             return;
         }
 
-        Error( pOperation->LineNumber, "Unrecognized instruction");
+        ErrorF( pOperation->LineNumber, "Unrecognized instruction: '%s'", pOperation->pName );
     }
 
 
@@ -895,7 +925,7 @@ namespace _INTERNAL{
         }
 
         
-        Error( pOperation->LineNumber, "Unrecognized instruction");
+        ErrorF( pOperation->LineNumber, "Unrecognized instruction: '%s'", pOperation->pName );
     }
 
     void Parser::Ternary( ParseNode* pOp, ParseNode* pDst, ParseNode* pSrc0, ParseNode* pSrc1, ParseNode* pSrc2  )
@@ -905,8 +935,8 @@ namespace _INTERNAL{
         
         OperationNode* pOperation = static_cast<OperationNode*>(pOp);
 
-        Error( pOperation->LineNumber, "Unrecognized instruction");
-
+        
+        ErrorF( pOperation->LineNumber, "Unrecognized instruction: '%s'", pOperation->pName );
 
         // TODO
         /*
@@ -970,13 +1000,14 @@ namespace _INTERNAL{
         m_Instructions.push_back( Instruction() ); // reserve a spot
     }
 
-    void Parser::JmpIf( TokenStruct& label, ParseNode* pFlagRef )
+    void Parser::JmpIf( TokenStruct& label, ParseNode* pFlagRef, bool bInvert )
     {
         Jump jmp;
         jmp.nJumpIndex = m_Instructions.size();
         jmp.nLine = label.LineNumber;
         jmp.pFlagRef = pFlagRef;
         jmp.pLabelName = label.fields.ID;
+        jmp.bInvertPredicate = bInvert;
         m_Jumps.push_back(jmp);
         m_Instructions.push_back( Instruction() ); // reserve a spot
     }
@@ -1060,7 +1091,8 @@ namespace _INTERNAL{
                 rInst.SetFlagReference( pFlagRef->Flag );
                 
                 Predicate pred;
-                pred.Set( PM_ANY16H, false );
+                pred.Set( PM_ANY16H, it.bInvertPredicate );
+              
                 rInst.SetPredicate(pred);
             }
         }

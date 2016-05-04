@@ -711,6 +711,7 @@ namespace GEN
                 reg.bIsIndirect     = 1;
                 reg.dwAddrSubRegNum = rIndirect.GetAddressSubReg();
                 reg.nAddrImm        = rIndirect.GetImmediateOffset();
+                reg.dwRegFile       = RF_GRF;
             }
         }
 
@@ -1037,6 +1038,7 @@ namespace GEN
             bool align1 = fields.bAlign16 == 0;
             
 
+
             // Decode destination register
             if( align1 )
             {
@@ -1044,8 +1046,8 @@ namespace GEN
                 fields.Dest.dwHStride = DECODE_HStride(ReadBits( pIn, 62,61));
                 if( fields.Dest.bIsIndirect )
                 {
-                    fields.Dest.nAddrImm  = SignExtend( ReadBits(pIn,25,16), 9 );
-                    fields.Dest.dwAddrSubRegNum = ReadBits(pIn,28,26);
+                    fields.Dest.nAddrImm  = SignExtend( ReadBits(pIn,57,48), 9 );
+                    fields.Dest.dwAddrSubRegNum = ReadBits(pIn,60,58);
                 }
                 else
                 {
@@ -1059,8 +1061,8 @@ namespace GEN
                 fields.dwDestWriteMask = ReadBits(pIn,51,48);
                 if( fields.Dest.bIsIndirect )
                 {
-                    fields.Dest.nAddrImm  = SignExtend( ReadBits(pIn,25,16)<<4, 9 );
-                    fields.Dest.dwAddrSubRegNum = ReadBits(pIn,28,26);
+                    fields.Dest.nAddrImm  = SignExtend( ReadBits(pIn,57,52)<<4, 9 );
+                    fields.Dest.dwAddrSubRegNum = ReadBits(pIn,60,58);
                 }
                 else
                 {

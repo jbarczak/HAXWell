@@ -150,7 +150,7 @@ namespace GEN
                 else if( rRegI.GetImmediateOffset() > 0 )
                     sprintf(pBuffer,"r[a0.%u+%u]%s", rRegI.GetAddressSubReg(), rRegI.GetImmediateOffset(), pPrefix );
                 else
-                    sprintf(pBuffer,"r[a0.%u]%s", rRegI.GetAddressSubReg(), rRegI.GetImmediateOffset(), pPrefix );
+                    sprintf(pBuffer,"r[a0.%u]%s", rRegI.GetAddressSubReg(),  pPrefix );
             }
         }
 
@@ -196,9 +196,9 @@ namespace GEN
                 case DT_S8:     sprintf(tmp, "%d", rInstruction.GetImmediate<int8>());   break;
                 case DT_F64:    sprintf(tmp, "%f", rInstruction.GetImmediate<float>());  break;
                 case DT_F32:    sprintf(tmp, "%f", rInstruction.GetImmediate<double>()); break;
-                case DT_VEC_HALFBYTE_UINT:
-                case DT_VEC_HALFBYTE_SINT:  // immediates only
-                case DT_VEC_HALFBYTE_FLOAT:
+                case DT_VEC_HALFBYTE_UINT:  sprintf(tmp, "HALFBYTE-UINT??" ); break;
+                case DT_VEC_HALFBYTE_SINT:   sprintf(tmp, "HALFBYTE-SINT??" ); break;
+                case DT_VEC_HALFBYTE_FLOAT: sprintf(tmp, "HALFBYTE-FLOAT??" ); break;
                 default:
                     sprintf(tmp, "IMM??" );
                 }

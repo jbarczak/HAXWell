@@ -150,7 +150,8 @@ send_instruction:
 
 jmp_instruction:
     T_KW_JMP T_IDENTIFIER               { pParser->Jmp( $2 ); }
-|   T_KW_JMPIF flag_ref T_IDENTIFIER    { pParser->JmpIf( $3, $2.fields.node ); }
+|   T_KW_JMPIF '(' flag_ref ')' T_IDENTIFIER    { pParser->JmpIf( $5, $3.fields.node, false ); }
+|   T_KW_JMPIF '(' '!' flag_ref ')' T_IDENTIFIER    { pParser->JmpIf( $6, $4.fields.node, true ); }
 ;
 
 
@@ -159,7 +160,7 @@ predicate_block:
 ;
 
 predicate_block_header:
-    T_KW_PRED flag_ref  { pParser->BeginPredBlock( $2.fields.node ); }
+    T_KW_PRED '(' flag_ref ')'  { pParser->BeginPredBlock( $3.fields.node ); }
 ;
 
 block_instruction_list:
@@ -222,11 +223,11 @@ operation:
 
 optional_flag_ref:
     /* empty */ { $$.fields.node = 0; }
-|    flag_ref   { $$ = $1; }
+|    '(' flag_ref ')'  { $$ = $2; }
 ;
 
 flag_ref:
-    '(' T_IDENTIFIER '.' T_UINT_LITERAL ')' { $$.fields.node = pParser->FlagReference( $2, $4 ); }
+     T_IDENTIFIER '.' T_UINT_LITERAL  { $$.fields.node = pParser->FlagReference( $1, $3); }
 ;
 
 end:
