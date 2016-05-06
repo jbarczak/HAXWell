@@ -572,7 +572,7 @@ namespace _INTERNAL{
         else
         {
             IndirectRegRefNode* pInDir = static_cast<IndirectRegRefNode*>( pRegRef );
-            base = GEN::IndirectRegReference( pInDir->nGPR, pInDir->nAddrSubReg );
+            base = GEN::IndirectRegReference( pInDir->nGPR*32, pInDir->nAddrSubReg );
         }
         
         GEN::RegisterRegion region( base, vstride,width,hstride);
@@ -604,7 +604,7 @@ namespace _INTERNAL{
         else
         {
             IndirectRegRefNode* pInDir = static_cast<IndirectRegRefNode*>( pRegRef );
-            base = GEN::IndirectRegReference( pInDir->nGPR, pInDir->nAddrSubReg );
+            base = GEN::IndirectRegReference( pInDir->nGPR*32, pInDir->nAddrSubReg );
         }
         
         GEN::RegisterRegion region( base, 8,hstride,1); 
@@ -982,6 +982,10 @@ namespace _INTERNAL{
         else if( strcmp( msg.fields.ID, "UntypedWrite16x2" ) == 0 )
         {
             m_Instructions.push_back( GEN::UntypedWrite_SIMD16x2( pBind->bind, Dst1Reg, Dst0Reg ) );
+        }
+        else if( strcmp( msg.fields.ID, "OWordBlockWrite" ) == 0 )
+        {
+            m_Instructions.push_back( GEN::OWordBlockWrite( pBind->bind, Dst1Reg ) );
         }
         else
         {
