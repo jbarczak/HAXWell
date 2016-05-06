@@ -148,7 +148,12 @@ namespace GEN
                 if( rRegI.GetImmediateOffset() < 0 )
                     sprintf(pBuffer,"r[a0.%u-%u]%s", rRegI.GetAddressSubReg(), abs(rRegI.GetImmediateOffset()), pPrefix );
                 else if( rRegI.GetImmediateOffset() > 0 )
-                    sprintf(pBuffer,"r[a0.%u+%u]%s", rRegI.GetAddressSubReg(), rRegI.GetImmediateOffset(), pPrefix );
+                {
+                    if( rRegI.GetImmediateOffset() % 32 == 0 )
+                        sprintf(pBuffer,"r%u[a0.%u]%s", rRegI.GetImmediateOffset()/32, rRegI.GetAddressSubReg(),  pPrefix );
+                    else
+                        sprintf(pBuffer,"r%u[a0.%u+%u]%s", rRegI.GetAddressSubReg(), rRegI.GetImmediateOffset(), pPrefix );
+                }    
                 else
                     sprintf(pBuffer,"r[a0.%u]%s", rRegI.GetAddressSubReg(),  pPrefix );
             }
