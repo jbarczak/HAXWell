@@ -49,7 +49,7 @@ FLOATF  {FLOAT}"f"
 "jmp"                   { return T_KW_JMP; }
 "jmpif"                 { return T_KW_JMPIF; }
 "pred"                  { return T_KW_PRED; }
-{HEX_INT}               { yylval->fields.Int    = strtol(yytext,0,16); return T_UINT_LITERAL;   }
+{HEX_INT}               { yylval->fields.Int    = strtoul(yytext,0,16); return T_UINT_LITERAL;   }
 {INT}                   { yylval->fields.Int    = atoi(yytext);        return T_UINT_LITERAL;   }
 "-"{INT}                { yylval->fields.Int    = atoi(yytext);        return T_INT_LITERAL;    }
 {FLOATF}                { yylval->fields.Float  = atof(yytext);        return T_FLOAT_LITERAL;  }
