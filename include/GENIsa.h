@@ -349,7 +349,7 @@ namespace GEN
                 uint8 m_nRegOffset; // byte offset into register (sub-register)
             } Direct;
             struct{ // regtype is implicitly 'GPR'
-                int16 m_nImmediateOffset;
+                int16 m_nImmediateOffset;   /// Byte offset into register file
                 uint8 m_nAddressSubReg;
             } Indirect;
         };
@@ -456,7 +456,7 @@ namespace GEN
             memcpy(fields.Imm,&IMM,sizeof(IMM));
         }
 
-        SourceOperand( DataTypes eType, const RegisterRegion& reg ) : m_eDataType(eType), m_bImmediate(false)
+        SourceOperand( DataTypes eType, const RegisterRegion& reg ) : m_eDataType(eType), m_bImmediate(false),m_eModifier(SM_NONE)
         {
             SetRegRegion(reg);
         }
@@ -856,6 +856,7 @@ namespace GEN
     ///   Source[1] contains write data
     ///
     SendInstruction OWordDualBlockWrite( uint32 nBindTableIndex, uint32 nSourceGPR );
+    SendInstruction OWordBlockWrite( uint32 nBindTableIndex,  GEN::RegReference source );
       
 
     /// Send OWord dual block write message (useful for writing an entire GPR)

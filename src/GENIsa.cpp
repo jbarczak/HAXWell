@@ -156,10 +156,26 @@ namespace GEN
         return write;
     }
 
+    SendInstruction OWordBlockWrite( uint32 nBindTableIndex, GEN::RegReference Source )
+    {
+        uint32 dwDescriptor = 0;
+        dwDescriptor  = (0x2)<<25; // message length (including header)
+        dwDescriptor |= (1<<19); // this message needs a header
+        dwDescriptor |= 0x8<<14; // message type (block write)
+        dwDescriptor |= 0x000;   // block length (in owords).  0 ==> Write lower oword.  1 ==> Write upper oword
+        dwDescriptor |=  (nBindTableIndex&0xff);
+
+        SendInstruction write( 8,SFID_DP_DC0, dwDescriptor,
+                                DestOperand( DT_U32, RegisterRegion( DirectRegReference(REG_NULL,0),8,8,1)),
+                                SourceOperand( DT_U32,  RegisterRegion( Source,8,8,1)) );
+        return write;
+    }
+
+
     SendInstruction OWordDualBlockRead( uint32 nBindTableIndex, uint32 nAddress, uint32 nData )
     {
         uint32 dwDescriptor = 0;
-        dwDescriptor  = (0x1<<25); // message length (excluding header)
+        dwDescriptor  = (0x1<<25); // message length (including header)
         dwDescriptor |= (1<<20);   // response length (1 gpr)
         dwDescriptor |= (1<<19);   // this message needs a header
         dwDescriptor |= 0x0<<14;   // message type (block read)
@@ -176,7 +192,7 @@ namespace GEN
     SendInstruction OWordDualBlockReadAndInvalidate( uint32 nBindTableIndex, uint32 nAddress, uint32 nData )
     {
         uint32 dwDescriptor = 0;
-        dwDescriptor  = (0x1<<25); // message length (excluding header)
+        dwDescriptor  = (0x1<<25); // message length (including header)
         dwDescriptor |= (1<<13);   // invalidate lines after reading
         dwDescriptor |= (1<<20);   // response length (1 gpr)
         dwDescriptor |= (1<<19);   // this message needs a header
