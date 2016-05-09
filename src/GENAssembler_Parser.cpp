@@ -51,9 +51,26 @@ namespace _INTERNAL{
     };
     struct SourceNode : public ParseNode
     {
-        SourceNode( size_t line ) : ParseNode(line){}
-        SourceOperand source;
+        SourceNode( size_t line ) : ParseNode(line) {}
+        virtual bool IsImmediate() = 0;
     };
+    struct SourceRegNode : public SourceNode
+    {
+        SourceRegNode( size_t line ) : SourceNode(line){}
+        GEN::DataTypes eType;
+        RegReference base;
+        RegionNode* pRegionNode;
+        virtual bool IsImmediate() { return false; }
+    
+    };
+
+    struct ImmediateNode : public SourceNode
+    {
+        ImmediateNode( size_t line ) : SourceNode(line){}
+        SourceOperand imm;
+        virtual bool IsImmediate() { return true; }
+    };
+
     struct DestRegNode : public ParseNode
     {
         DestRegNode( size_t line ) : ParseNode(line){}
@@ -551,16 +568,8 @@ namespace _INTERNAL{
         SubRegNode* pSub = static_cast<SubRegNode*>( pSubReg );
         GEN::DataTypes eType = pSub->eType;
 
-        size_t width  =8;
-        size_t hstride=1;
-        size_t vstride=8;
-        if( pRegion )
-        {
-            RegionNode* pRegionNode = static_cast<RegionNode*>( pRegion );
-            width   = pRegionNode->width;
-            hstride = pRegionNode->hstride;
-            vstride = pRegionNode->vstride;
-        }
+        RegionNode* pRegionNode = static_cast<RegionNode*>(pRegion);
+       
 
         RegRefNode* pRegRef = static_cast<RegRefNode*>(pReg);
         GEN::RegReference base;
@@ -575,14 +584,14 @@ namespace _INTERNAL{
             base = GEN::IndirectRegReference( pInDir->nGPR*32, pInDir->nAddrSubReg );
         }
         
-        GEN::RegisterRegion region( base, vstride,width,hstride);
-        GEN::SourceOperand operand( eType, region );
-
-        SourceNode* pS = new SourceNode(pReg->LineNumber);
+        
+        SourceRegNode* pS = new SourceRegNode(pReg->LineNumber);
         m_Nodes.push_back(pS);
 
-        pS->source = operand;
-
+        pS->base = base;
+        pS->eType = eType;
+        pS->pRegionNode = pRegionNode;
+        
         return pS;
     }
       
@@ -647,16 +656,16 @@ namespace _INTERNAL{
 
     ParseNode* Parser::IntLiteral( size_t line, int i )
     {
-        SourceNode* pS = new SourceNode(line);
+        ImmediateNode* pS = new ImmediateNode(line);
         m_Nodes.push_back(pS);
-        pS->source = GEN::SourceOperand( GEN::DT_S32, i );
+        pS->imm = GEN::SourceOperand( GEN::DT_S32, i );
         return pS;
     }
     ParseNode* Parser::FloatLiteral( size_t line, float f )
     {
-        SourceNode* pS = new SourceNode(line);
+        ImmediateNode* pS = new ImmediateNode(line);
         m_Nodes.push_back(pS);       
-        pS->source = GEN::SourceOperand(f);
+        pS->imm = GEN::SourceOperand(f);
         return pS;
     }
     ParseNode* Parser::FlagReference( TokenStruct& id, TokenStruct& subReg )
@@ -686,10 +695,35 @@ namespace _INTERNAL{
         return pDestNode->dest;
     }
 
-    static SourceOperand SourceFromNode( ParseNode* pDst )
+    static SourceOperand SourceFromNode( ParseNode* pDst, size_t nExecSize )
     {
         SourceNode* pSrcNode = static_cast<SourceNode*>(pDst);
-        return pSrcNode->source;
+        if( pSrcNode->IsImmediate() )
+            return static_cast<ImmediateNode*>(pSrcNode)->imm;
+        
+        SourceRegNode* pSrcReg = static_cast<SourceRegNode*>(pSrcNode);
+        RegisterRegion reg;
+        
+        if( pSrcReg->pRegionNode )
+        {
+            // TODO: Validate region description against exec size
+            reg = RegisterRegion( pSrcReg->base, pSrcReg->pRegionNode->vstride, pSrcReg->pRegionNode->width, pSrcReg->pRegionNode->hstride );
+        }
+        else
+        {
+            // use default region description
+            switch(nExecSize)
+            {
+            case 1:
+                reg = RegisterRegion( pSrcReg->base, 0,1,0 );
+                break;
+            default:
+                reg = RegisterRegion( pSrcReg->base, nExecSize,nExecSize,1 );
+                break;
+            }
+        }
+        
+        return SourceOperand( pSrcReg->eType, reg );
     }
 
 
@@ -737,7 +771,7 @@ namespace _INTERNAL{
         if( pID )
         {
             m_Instructions.push_back( 
-                GEN::MathInstruction( pOperation->nExecSize, (MathFunctionIDs)pID->ID, DestFromNode(pDst), SourceFromNode(pSrc) )
+                GEN::MathInstruction( pOperation->nExecSize, (MathFunctionIDs)pID->ID, DestFromNode(pDst), SourceFromNode(pSrc,pOperation->nExecSize) )
                 );
             return;
         }
@@ -746,7 +780,7 @@ namespace _INTERNAL{
         if( pID )
         {
             m_Instructions.push_back( 
-                GEN::UnaryInstruction( pOperation->nExecSize, (Operations)pID->ID, DestFromNode(pDst), SourceFromNode(pSrc) )
+                GEN::UnaryInstruction( pOperation->nExecSize, (Operations)pID->ID, DestFromNode(pDst), SourceFromNode(pSrc,pOperation->nExecSize) )
                 );
             return;
         }
@@ -818,8 +852,8 @@ namespace _INTERNAL{
             m_Instructions.push_back( 
                 GEN::MathInstruction( pOperation->nExecSize, (MathFunctionIDs)pID->ID, 
                     DestFromNode(pDst), 
-                    SourceFromNode(pSrc0),
-                    SourceFromNode(pSrc1))
+                    SourceFromNode(pSrc0,pOperation->nExecSize),
+                    SourceFromNode(pSrc1,pOperation->nExecSize))
                 );
             return;
         }
@@ -830,8 +864,8 @@ namespace _INTERNAL{
             m_Instructions.push_back( 
                 GEN::BinaryInstruction( pOperation->nExecSize, (Operations)pID->ID, 
                     DestFromNode(pDst), 
-                    SourceFromNode(pSrc0),
-                    SourceFromNode(pSrc1))
+                    SourceFromNode(pSrc0,pOperation->nExecSize),
+                    SourceFromNode(pSrc1,pOperation->nExecSize))
                 );
             return;
         }
@@ -848,8 +882,8 @@ namespace _INTERNAL{
 
             auto op =  GEN::BinaryInstruction( pOperation->nExecSize, OP_CMP,
                     DestFromNode(pDst),
-                    SourceFromNode(pSrc0),
-                    SourceFromNode(pSrc1) );
+                    SourceFromNode(pSrc0,pOperation->nExecSize),
+                    SourceFromNode(pSrc1,pOperation->nExecSize) );
                
             op.SetFlagReference( pFlag->Flag );
             op.SetConditionalModifier( (ConditionalModifiers)pID->ID );
@@ -861,13 +895,13 @@ namespace _INTERNAL{
         // turn 'sub' into add with negated source
         if( strcmp( pOperation->pName, "sub" ) == 0 )
         {
-            SourceOperand src1 = SourceFromNode(pSrc1);
+            SourceOperand src1 = SourceFromNode(pSrc1,pOperation->nExecSize);
            
             src1.SetModifier(SM_NEGATE);
              GEN::BinaryInstruction inst = 
                 GEN::BinaryInstruction( pOperation->nExecSize, OP_ADD,
                     DestFromNode(pDst), 
-                    SourceFromNode(pSrc0),
+                    SourceFromNode(pSrc0,pOperation->nExecSize),
                     src1
                 );
             m_Instructions.push_back( inst );
@@ -877,8 +911,8 @@ namespace _INTERNAL{
          // turn binary 'fma' into ternary with dst = src
         if( strcmp( pOperation->pName, "fma" ) == 0 )
         {
-            SourceOperand src1 = SourceFromNode(pSrc0);
-            SourceOperand src2 = SourceFromNode(pSrc1);
+            SourceOperand src1 = SourceFromNode(pSrc0,pOperation->nExecSize);
+            SourceOperand src2 = SourceFromNode(pSrc1,pOperation->nExecSize);
             DestOperand dst = DestFromNode(pDst);
 
             SourceOperand src0 = SourceOperand(dst.GetDataType(), 
@@ -902,8 +936,8 @@ namespace _INTERNAL{
             GEN::BinaryInstruction inst = 
                 GEN::BinaryInstruction( pOperation->nExecSize, OP_SEL,
                     DestFromNode(pDst), 
-                    SourceFromNode(pSrc0),
-                    SourceFromNode(pSrc1)
+                    SourceFromNode(pSrc0,pOperation->nExecSize),
+                    SourceFromNode(pSrc1,pOperation->nExecSize)
                 );
 
             inst.SetConditionalModifier( CM_LESS_EQUAL );
@@ -915,8 +949,8 @@ namespace _INTERNAL{
             GEN::BinaryInstruction inst = 
                 GEN::BinaryInstruction( pOperation->nExecSize, OP_SEL,
                     DestFromNode(pDst), 
-                    SourceFromNode(pSrc0),
-                    SourceFromNode(pSrc1)
+                    SourceFromNode(pSrc0,pOperation->nExecSize),
+                    SourceFromNode(pSrc1,pOperation->nExecSize)
                 );
 
             inst.SetConditionalModifier( CM_GREATER_EQUAL );

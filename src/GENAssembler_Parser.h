@@ -19,6 +19,7 @@ namespace GEN
         struct ParseNode
         {
             ParseNode( size_t line ) : LineNumber(line){}
+            virtual ~ParseNode(){};
             size_t LineNumber;
         };
 
