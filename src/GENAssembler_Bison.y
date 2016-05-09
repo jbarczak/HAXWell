@@ -91,7 +91,7 @@ curbe_literal:
 
 
 threads_decl:
-    T_KW_THREADS T_UINT_LITERAL { pParser->ThreadCount( $1 ); }
+    T_KW_THREADS T_UINT_LITERAL { pParser->ThreadCount( $2 ); }
 ;
 
 reg_decl:
