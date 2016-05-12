@@ -1178,6 +1178,97 @@ namespace _INTERNAL{
         m_NamedRegs.push_back(NamedReg(pLabel,reg, nArraySize));
     }
 
+    void Parser::VecIMMPush( ParseNode* pN )
+    {
+        if( m_nVecIMMNodes >= 8 )
+        {
+            Error(pN->LineNumber, "Too many initializers in vector immediate");
+            return;
+        }
+        m_pVecIMMNodes[m_nVecIMMNodes++] = pN;
+    }
+
+    ParseNode* Parser::EndVectorImmediate()
+    {
+        if( m_bError )
+            return 0;
+
+
+        switch( m_eVecImmType )
+        {
+        default:
+            Error(m_nVecIMMLine, "INTERNAL ERROR");
+            return 0;
+
+        case GEN::DT_VEC_HALFBYTE_FLOAT:
+            {
+                Error(m_nVecIMMLine, "Vec-float imm not implemented");
+                return 0;
+            }
+            break;
+
+        case GEN::DT_VEC_HALFBYTE_SINT:
+        case GEN::DT_VEC_HALFBYTE_UINT:
+            {
+                int pValues[8];
+                for( size_t i=0; i<m_nVecIMMNodes; i++ )
+                {
+                    ImmediateNode* pIMM = static_cast<ImmediateNode*>(m_pVecIMMNodes[i]);
+                    const uint8* pImmediateBits = pIMM->imm.GetImmediateBits();
+                    switch( pIMM->imm.GetDataType() )
+                    {
+                    case DT_F32:    pValues[i] = *((float*)pImmediateBits); break;
+                    case DT_F64:    pValues[i] = *((double*)pImmediateBits); break;
+                    case DT_S32:
+                    case DT_U32:
+                        pValues[i] = *((int*)pImmediateBits); 
+                        break;
+                    }
+                }
+                for( size_t i=m_nVecIMMNodes; i<8; i++ )
+                    pValues[i] = 0;
+
+                // check ranges
+                if( m_eVecImmType == GEN::DT_VEC_HALFBYTE_SINT )
+                {
+                    for( size_t i=0; i<m_nVecIMMNodes; i++ )
+                    {
+                        if( pValues[i] < -8 || pValues[i] > 7 )
+                        {
+                            ErrorF(m_nVecIMMLine,"%d is out of range for vector immediate", pValues[i] );
+                            return 0;
+                        }
+                    }
+
+                    
+                    ImmediateNode* pImm = new ImmediateNode(m_nVecIMMLine);
+                    pImm->imm = PackHalfByte_SINT(pValues);
+                    m_Nodes.push_back(pImm);
+                    return pImm;
+                }
+                else
+                {
+                    for( size_t i=0; i<m_nVecIMMNodes; i++ )
+                    {
+                        if( pValues[i] < 0 || pValues[i] > 15 )
+                        {
+                            ErrorF(m_nVecIMMLine,"%d is out of range for vector immediate", pValues[i] );
+                            return 0;
+                        }
+                    }
+                    
+                    ImmediateNode* pImm = new ImmediateNode(m_nVecIMMLine);
+                    pImm->imm = PackHalfByte_UINT((const uint32*)pValues);
+                    m_Nodes.push_back(pImm);
+                    return pImm;
+                }
+            }
+            break;
+        }
+    }
+
+
+
     bool Parser::Parse( const char* pText, IPrinter* pErrorStream )
     {
         m_pText = pText;

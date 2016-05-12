@@ -38,6 +38,9 @@
 %token T_KW_JMP
 %token T_KW_JMPIF
 %token T_KW_PRED
+%token T_KW_IMM_UVEC
+%token T_KW_IMM_IVEC
+%token T_KW_IMM_FVEC
 %%
 
 program: 
@@ -211,10 +214,35 @@ src_reg_or_literal:
 
 
 literal:
-    T_INT_LITERAL   { $$.fields.node = pParser->IntLiteral( $1.LineNumber, $1.fields.Int ); }
-|   T_UINT_LITERAL  { $$.fields.node = pParser->IntLiteral( $1.LineNumber, $1.fields.Int ); }
-|   T_FLOAT_LITERAL { $$.fields.node = pParser->FloatLiteral($1.LineNumber,  $1.fields.Float ); }
+    T_INT_LITERAL    { $$.fields.node = pParser->IntLiteral( $1.LineNumber, $1.fields.Int ); }
+|   T_UINT_LITERAL   { $$.fields.node = pParser->IntLiteral( $1.LineNumber, $1.fields.Int ); }
+|   T_FLOAT_LITERAL  { $$.fields.node = pParser->FloatLiteral($1.LineNumber,  $1.fields.Float ); }
+|   vector_immediate { $$ = $1; }
 ;
+
+
+vector_immediate:
+    vector_immediate_begin '(' vec_imm_literal_list ')' { $$.fields.node = pParser->EndVectorImmediate(); }
+;
+
+vector_immediate_begin:
+     T_KW_IMM_UVEC { pParser->BeginIMM_UVec($1.LineNumber); }
+|    T_KW_IMM_IVEC { pParser->BeginIMM_IVec($1.LineNumber); }
+|    T_KW_IMM_FVEC { pParser->BeginIMM_FVec($1.LineNumber); }
+;
+
+vec_imm_literal_list:
+    vec_imm_literal
+|   vec_imm_literal_list ',' vec_imm_literal
+;
+
+vec_imm_literal:
+    T_INT_LITERAL       { pParser->VecIMMPush( pParser->IntLiteral( $1.LineNumber, $1.fields.Int )     ); }
+|   T_UINT_LITERAL      { pParser->VecIMMPush( pParser->IntLiteral( $1.LineNumber, $1.fields.Int )     ); }
+|   T_FLOAT_LITERAL     { pParser->VecIMMPush( pParser->FloatLiteral($1.LineNumber,  $1.fields.Float ) ); }
+|   T_DOUBLE_LITERAL    { pParser->VecIMMPush( pParser->FloatLiteral($1.LineNumber,  $1.fields.Float ) ); }
+;
+
 
 
 operation: 

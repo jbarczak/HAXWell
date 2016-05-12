@@ -201,8 +201,24 @@ namespace GEN
                 case DT_S8:     sprintf(tmp, "%d", rInstruction.GetImmediate<int8>());   break;
                 case DT_F64:    sprintf(tmp, "%f", rInstruction.GetImmediate<float>());  break;
                 case DT_F32:    sprintf(tmp, "%f", rInstruction.GetImmediate<double>()); break;
-                case DT_VEC_HALFBYTE_UINT:  sprintf(tmp, "HALFBYTE-UINT??" ); break;
-                case DT_VEC_HALFBYTE_SINT:   sprintf(tmp, "HALFBYTE-SINT??" ); break;
+                case DT_VEC_HALFBYTE_UINT:  
+                    {
+                        unsigned int pVals[8];
+                        UnpackHalfByte_UINT(pVals,rInstruction.GetImmediate<uint32>() );
+                        sprintf(tmp,"imm_uvec(%u,%u,%u,%u,%u,%u,%u,%u)", 
+                                pVals[0],pVals[1],pVals[2],pVals[3],
+                                pVals[4],pVals[5],pVals[6],pVals[7]);
+                    }
+                    break;
+                case DT_VEC_HALFBYTE_SINT:  
+                    {
+                        int pVals[8];
+                        UnpackHalfByte_SINT(pVals,rInstruction.GetImmediate<uint32>() );
+                        sprintf(tmp,"imm_ivec(%d,%d,%d,%d,%d,%d,%d,%d)", 
+                                pVals[0],pVals[1],pVals[2],pVals[3],
+                                pVals[4],pVals[5],pVals[6],pVals[7]);
+                    }
+                    break;
                 case DT_VEC_HALFBYTE_FLOAT: sprintf(tmp, "HALFBYTE-FLOAT??" ); break;
                 default:
                     sprintf(tmp, "IMM??" );

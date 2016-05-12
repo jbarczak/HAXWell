@@ -904,6 +904,13 @@ namespace GEN
     ///
     SendInstruction ReadGatewayTimestamp( uint32 nDestReg, uint32 nSrcReg );
 
+
+    SourceOperand PackHalfByte_SINT( const int32* pInts );
+    SourceOperand PackHalfByte_UINT( const uint32* pInts );
+
+    void UnpackHalfByte_SINT( int* pInts, uint32 bits );
+    void UnpackHalfByte_UINT( unsigned int* pInts, uint32 bits );
+
 }
 
 

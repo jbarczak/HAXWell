@@ -96,6 +96,15 @@ namespace GEN
             void BeginPredBlock( ParseNode* pFlagRef );
             void EndPredBlock();
 
+
+            void BeginIMM_UVec( size_t line ) { m_nVecIMMNodes=0; m_nVecIMMLine = line; m_eVecImmType = GEN::DT_VEC_HALFBYTE_UINT;  }
+            void BeginIMM_IVec( size_t line ) { m_nVecIMMNodes=0; m_nVecIMMLine = line; m_eVecImmType = GEN::DT_VEC_HALFBYTE_SINT;  }
+            void BeginIMM_FVec( size_t line ) { m_nVecIMMNodes=0; m_nVecIMMLine = line; m_eVecImmType = GEN::DT_VEC_HALFBYTE_FLOAT; }
+
+            void VecIMMPush( ParseNode* p );
+
+            ParseNode* EndVectorImmediate();
+
             yyscan_t m_scanner;
 
         private:
@@ -147,6 +156,12 @@ namespace GEN
             std::vector< Jump > m_Jumps;
             std::vector<uint8> m_CURBE;
             std::vector<Instruction> m_Instructions;
+
+            ParseNode* m_pVecIMMNodes[8];
+            size_t m_nVecIMMNodes;
+            GEN::DataTypes m_eVecImmType;
+            size_t m_nVecIMMLine;
+
             bool m_bError;
 
             uint8 m_CURBEScratch[32];

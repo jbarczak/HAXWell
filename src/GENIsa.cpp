@@ -371,4 +371,48 @@ namespace GEN
         return msg;
     }
 
+    SourceOperand PackHalfByte_SINT( const int32* pValues )
+    {
+        uint32 Bits=0;
+        for( size_t i=0; i<8; i++ )
+        {
+            int32 v = (pValues[i])&0xf;
+            Bits |= (v<<(4*i));
+        }
+        
+        return SourceOperand( DT_VEC_HALFBYTE_SINT, Bits );
+    }
+
+    SourceOperand PackHalfByte_UINT( const uint32* pValues )
+    {
+        uint32 Bits=0;
+        for( size_t i=0; i<8; i++ )
+        {
+            uint32 v = (pValues[i]&0xf);
+            Bits |= (v<<(4*i));
+        }
+
+        return SourceOperand( DT_VEC_HALFBYTE_UINT, Bits );
+    }
+
+     
+    void UnpackHalfByte_SINT( int* pInts, uint32 bits )
+    {
+        for( size_t i=0; i<8; i++ )
+        {
+            uint32 v = bits>>(4*i);
+            v |= ~( (v & 8) - 1);
+            pInts[i] = (int32)v;
+        }
+    }
+
+    void UnpackHalfByte_UINT( unsigned int* pInts, uint32 bits )
+    {
+        for( size_t i=0; i<8; i++ )
+        {
+            uint32 v = bits>>(4*i);
+            pInts[i] = v&0xf;
+        }
+    }
+
 }

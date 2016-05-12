@@ -49,6 +49,9 @@ FLOATF  {FLOAT}"f"
 "jmp"                   { return T_KW_JMP; }
 "jmpif"                 { return T_KW_JMPIF; }
 "pred"                  { return T_KW_PRED; }
+"imm_uvec"              { return T_KW_IMM_UVEC; }
+"imm_ivec"              { return T_KW_IMM_IVEC; }
+"imm_fvec"              { return T_KW_IMM_FVEC; }
 {HEX_INT}               { yylval->fields.Int    = strtoul(yytext,0,16); return T_UINT_LITERAL;   }
 {INT}                   { yylval->fields.Int    = atoi(yytext);        return T_UINT_LITERAL;   }
 "-"{INT}                { yylval->fields.Int    = atoi(yytext);        return T_INT_LITERAL;    }
