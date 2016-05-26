@@ -41,14 +41,31 @@ namespace _INTERNAL{
         size_t nAddrSubReg;
     };
 
-    struct RegionNode : public ParseNode
+    struct SourceModifierNode : public ParseNode
     {
-        RegionNode( size_t line ) : ParseNode(line){}
+        SourceModifierNode( size_t line ) : ParseNode(line) {}
+        virtual bool IsSwizzle() =0;
+    };
+
+    struct RegionNode : public SourceModifierNode
+    {
+        RegionNode( size_t line ) : SourceModifierNode(line){}
     
         int width;
         int hstride;
         int vstride;
+        virtual bool IsSwizzle() { return false; }
     };
+
+    
+    struct SwizzleNode : public SourceModifierNode
+    {
+        SwizzleNode( size_t line ) : SourceModifierNode(line){}
+    
+        GEN::Swizzle swizz;
+        virtual bool IsSwizzle() { return true; }
+    };
+
     struct SourceNode : public ParseNode
     {
         SourceNode( size_t line ) : ParseNode(line) {}
@@ -59,7 +76,7 @@ namespace _INTERNAL{
         SourceRegNode( size_t line ) : SourceNode(line){}
         GEN::DataTypes eType;
         RegReference base;
-        RegionNode* pRegionNode;
+        SourceModifierNode* pRegionOrSwizzle;
         virtual bool IsImmediate() { return false; }
     
     };
@@ -559,18 +576,64 @@ namespace _INTERNAL{
         pN->LineNumber = line;
         return pN;
     }
+    
+    ParseNode* Parser::Swizzle( TokenStruct& tok )
+    {
+        SwizzleNode* pN = new SwizzleNode(tok.LineNumber);
+        m_Nodes.push_back(pN);
 
-    ParseNode* Parser::SourceReg( ParseNode* pReg, ParseNode* pRegion, ParseNode* pSubReg )
+        const char* pStr = tok.fields.ID;
+        uint8 pIDs[4] = {0,1,2,3};
+        
+        size_t i=0;
+        while( pStr[i] )
+        {
+            if( i>= 4 )
+            {
+                ErrorF(tok.LineNumber, "%s is not a legal swizzle string");
+                return 0;
+            }
+
+            switch( pStr[i] )
+            {
+            case 'x':
+            case 'X':
+                pIDs[i] = 0;
+                break;
+            case 'y':
+            case 'Y':
+                pIDs[i] = 1;
+                break;
+            case 'z':
+            case 'Z':
+                pIDs[i] = 2;
+                break;
+            case 'w':
+            case 'W':
+                pIDs[i] = 3;
+                break;
+            default:   
+                ErrorF(tok.LineNumber, "%s is not a legal swizzle string");
+                return 0;
+            }
+            i++;
+        }
+
+        pN->swizz.x = pIDs[0];
+        pN->swizz.y = pIDs[1];
+        pN->swizz.z = pIDs[2];
+        pN->swizz.w = pIDs[3];
+        return pN;
+    }
+
+    ParseNode* Parser::SourceReg( ParseNode* pReg, ParseNode* pRegionOrSwizzle, ParseNode* pSubReg )
     {
         if( !pReg || !pSubReg )
             return 0; // bail out in the event of a parse error
         
         SubRegNode* pSub = static_cast<SubRegNode*>( pSubReg );
         GEN::DataTypes eType = pSub->eType;
-
-        RegionNode* pRegionNode = static_cast<RegionNode*>(pRegion);
        
-
         RegRefNode* pRegRef = static_cast<RegRefNode*>(pReg);
         GEN::RegReference base;
         if( pRegRef->bIsDirect )
@@ -583,14 +646,14 @@ namespace _INTERNAL{
             IndirectRegRefNode* pInDir = static_cast<IndirectRegRefNode*>( pRegRef );
             base = GEN::IndirectRegReference( pInDir->nGPR*32, pInDir->nAddrSubReg );
         }
-        
+       
         
         SourceRegNode* pS = new SourceRegNode(pReg->LineNumber);
         m_Nodes.push_back(pS);
 
         pS->base = base;
         pS->eType = eType;
-        pS->pRegionNode = pRegionNode;
+        pS->pRegionOrSwizzle = static_cast<SourceModifierNode*>(pRegionOrSwizzle);;
         
         return pS;
     }
@@ -702,28 +765,39 @@ namespace _INTERNAL{
             return static_cast<ImmediateNode*>(pSrcNode)->imm;
         
         SourceRegNode* pSrcReg = static_cast<SourceRegNode*>(pSrcNode);
-        RegisterRegion reg;
         
-        if( pSrcReg->pRegionNode )
+        // default region description
+        RegisterRegion reg;
+        switch(nExecSize)
         {
-            // TODO: Validate region description against exec size
-            reg = RegisterRegion( pSrcReg->base, pSrcReg->pRegionNode->vstride, pSrcReg->pRegionNode->width, pSrcReg->pRegionNode->hstride );
+        case 1:
+            reg = RegisterRegion( pSrcReg->base, 0,1,0 );
+            break;
+        default:
+            reg = RegisterRegion( pSrcReg->base, nExecSize,nExecSize,1 );
+            break;
         }
-        else
+
+        // default swizzle
+        Swizzle swizz;
+
+
+        if( pSrcReg->pRegionOrSwizzle )
         {
-            // use default region description
-            switch(nExecSize)
+            if( pSrcReg->pRegionOrSwizzle->IsSwizzle() )
             {
-            case 1:
-                reg = RegisterRegion( pSrcReg->base, 0,1,0 );
-                break;
-            default:
-                reg = RegisterRegion( pSrcReg->base, nExecSize,nExecSize,1 );
-                break;
+                SwizzleNode* pN = static_cast<SwizzleNode*>(pSrcReg->pRegionOrSwizzle);
+                swizz = pN->swizz;
+            }
+            else
+            {
+                // TODO: Validate region description against exec size
+                RegionNode* pN = static_cast<RegionNode*>(pSrcReg->pRegionOrSwizzle);
+                reg = RegisterRegion( pSrcReg->base, pN->vstride, pN->width, pN->hstride );
             }
         }
         
-        return SourceOperand( pSrcReg->eType, reg );
+        return SourceOperand( pSrcReg->eType, reg, swizz );
     }
 
 

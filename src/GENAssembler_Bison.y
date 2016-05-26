@@ -189,6 +189,11 @@ dest_reg:
 src_reg:
     reg_identifier '.' sub_reg                { $$.fields.node = pParser->SourceReg( $1.fields.node, 0, $3.fields.node ); }
 |   reg_identifier '.' sub_reg source_region  { $$.fields.node = pParser->SourceReg( $1.fields.node, $4.fields.node, $3.fields.node ); }
+|   reg_identifier '.' sub_reg swizzle        { $$.fields.node = pParser->SourceReg( $1.fields.node, $4.fields.node, $3.fields.node ); }
+;
+
+swizzle:
+    '(' T_IDENTIFIER ')' { $$.fields.node = pParser->Swizzle( $2 ); }
 ;
 
 source_region:

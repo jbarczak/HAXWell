@@ -285,11 +285,20 @@ namespace GEN
     struct Swizzle
     {
         Swizzle() : x(0), y(1), z(2), w(3){};
-
+        Swizzle( uint32 packed )
+            :x(packed&3),
+             y((packed>>2)&3),
+             z((packed>>4)&3),
+             w((packed>>6)&3)
+        {
+        }
         unsigned x : 2;
         unsigned y : 2;
         unsigned z : 2;
         unsigned w : 2;
+
+        bool IsIdentity() const { return x == 0 && y == 1 && z == 2 && w == 3; }
+        uint32 PackBits() const { return x | (y<<2) | (z<<4) | (w<<6);};
     };
 
     class Predicate
@@ -460,6 +469,10 @@ namespace GEN
         {
             SetRegRegion(reg);
         }
+        SourceOperand( DataTypes eType, const RegisterRegion& reg, Swizzle swizz ) : m_eDataType(eType), m_Swizzle(swizz), m_bImmediate(false),m_eModifier(SM_NONE)
+        {
+            SetRegRegion(reg);
+        }
         
         SourceOperand( DataTypes eType, SourceModifiers eMod ) : m_eDataType(eType), m_bImmediate(true),m_eModifier(eMod){};
         SourceOperand( DataTypes eType, const RegisterRegion& reg, SourceModifiers eMod ) 
@@ -467,6 +480,12 @@ namespace GEN
         {
             SetRegRegion(reg);
         }
+        SourceOperand( DataTypes eType, const RegisterRegion& reg, Swizzle swizz, SourceModifiers eMod ) 
+            : m_eDataType(eType), m_bImmediate(false) ,m_eModifier(eMod), m_Swizzle(swizz)
+        {
+            SetRegRegion(reg);            
+        }
+
 
         bool IsImmediate() const { return m_bImmediate != 0; }
         DataTypes GetDataType() const { return (DataTypes)m_eDataType; }

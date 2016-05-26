@@ -717,10 +717,13 @@ namespace GEN
 
         void FillSourceRegFields( RegisterFields& reg, const GEN::SourceOperand& rOperand )
         {
-            // TODO: Swizzle
-            //
             reg.dwModifier = rOperand.GetModifier();
-            reg.bAlign16   = false;
+            reg.dwChanSel = rOperand.GetSwizzle().PackBits();
+            if( rOperand.GetSwizzle().IsIdentity() )
+                reg.bAlign16   = false;
+            else
+                reg.bAlign16 = true;
+            
             if( rOperand.IsImmediate() )
             {
                 reg.dwDataType  = Encode_ImmDataTypes(rOperand.GetDataType() );
@@ -732,12 +735,14 @@ namespace GEN
             }
         }
 
-        void FillDestRegFields( RegisterFields& reg, const GEN::DestOperand& rOperand )
+        void FillDestRegFields( InstructionFields& reg, const GEN::DestOperand& rOperand )
         {
             // TODO: write mask
             // TODO: sat modifier
             reg.bAlign16 = false;
-            FillRegFields(reg,rOperand.GetRegRegion(), rOperand.GetDataType() );
+            reg.dwDestWriteMask = 0xffffffff;
+            reg.bSat = false;
+            FillRegFields(reg.Dest,rOperand.GetRegRegion(), rOperand.GetDataType() );
         }
      
 
@@ -757,14 +762,13 @@ namespace GEN
         
         void FillSourceRegFields3Src( RegisterFields& reg, const GEN::SourceOperand& rOperand )
         {
-            // TODO: swizzle
             auto& rSrcReg = static_cast<DirectRegReference&>( rOperand.GetRegRegion().GetBaseRegister());
             reg.bAlign16 = true;
             reg.dwDataType = Encode_RegDataTypes3Src(rOperand.GetDataType());
             reg.dwRegNum = rSrcReg.GetRegNumber();
             reg.dwSubRegNum = rSrcReg.GetSubRegOffset();
             reg.dwModifier = rOperand.GetModifier();    
-            reg.dwChanSel = 0xE4;
+            reg.dwChanSel = rOperand.GetSwizzle().PackBits();
         }
     
         
@@ -1059,6 +1063,7 @@ namespace GEN
             {
                 fields.Dest.dwHStride = 1;
                 fields.dwDestWriteMask = ReadBits(pIn,51,48);
+               
                 if( fields.Dest.bIsIndirect )
                 {
                     fields.Dest.nAddrImm  = SignExtend( ReadBits(pIn,57,52)<<4, 9 );
@@ -1232,7 +1237,7 @@ namespace GEN
             else
             {
                 DataTypes eDataType = (DataTypes) rReg.dwDataType ;
-                return GEN::SourceOperand(eDataType,InterpretRegisterRegion(rReg), eMod);
+                return GEN::SourceOperand(eDataType,InterpretRegisterRegion(rReg), GEN::Swizzle(rReg.dwChanSel), eMod);
             }
         }
 
@@ -1435,7 +1440,7 @@ namespace GEN
         pInst->m_Source0      = _INTERNAL::InterpretSource(fields.Src0);
         pInst->m_Source1      = _INTERNAL::InterpretSource(fields.Src1);
         pInst->m_Source2      = _INTERNAL::InterpretSource(fields.Src2);
-        pInst->m_Predicate.Set( (PredicationModes) fields.nPredControl, fields.bPredInvert );
+        pInst->m_Predicate.Set( (PredicationModes) fields.nPredControl, fields.bPredInvert !=0);
         pInst->m_Flags         = _INTERNAL::InterpretFlagReference(fields);
         return 16;
     }
@@ -1449,7 +1454,7 @@ namespace GEN
         pInst->m_nExecSize    = fields.nExecSize;
         pInst->m_bNoWriteMask = fields.bMaskControl;
         pInst->m_bNoDDChk     = fields.bNoDDChk;
-        pInst->m_Predicate.Set( (PredicationModes) fields.nPredControl, fields.bPredInvert );
+        pInst->m_Predicate.Set( (PredicationModes) fields.nPredControl, fields.bPredInvert!=0 );
         pInst->m_Flags         = _INTERNAL::InterpretFlagReference(fields);
         if( eOp == OP_DIM )
             memcpy( pInst->m_ImmediateOperand, &fields.IMM64, 8 );
@@ -1591,7 +1596,7 @@ namespace GEN
         pInst->m_nExecSize      = fields.nExecSize;
         pInst->m_bNoWriteMask   = fields.bMaskControl;
         pInst->m_bEOT           = bEOT;
-        pInst->m_Predicate.Set( (PredicationModes) fields.nPredControl, fields.bPredInvert );
+        pInst->m_Predicate.Set( (PredicationModes) fields.nPredControl, fields.bPredInvert!=0 );
         pInst->m_Flags         = _INTERNAL::InterpretFlagReference(fields);
         return 16;
     }
@@ -1608,9 +1613,10 @@ namespace GEN
         pInst->m_eFunctionCtrl  = fields.nCondModifier;
         pInst->m_Dest           = _INTERNAL::InterpretDest(fields);
         pInst->m_Source0        = _INTERNAL::InterpretSource(fields.Src0);
+        pInst->m_Source1        = _INTERNAL::InterpretSource(fields.Src1);
         pInst->m_nExecSize      = fields.nExecSize;
         pInst->m_bNoWriteMask   = fields.bMaskControl;
-        pInst->m_Predicate.Set( (PredicationModes) fields.nPredControl, fields.bPredInvert );
+        pInst->m_Predicate.Set( (PredicationModes) fields.nPredControl, fields.bPredInvert !=0);
         pInst->m_Flags         = _INTERNAL::InterpretFlagReference(fields);
         return 16;
     }
@@ -1664,7 +1670,7 @@ namespace GEN
                     fields.IMM32 = it.GetImmediate<uint32>();
                     fields.IMM64 = it.GetImmediate<uint64>();
                     fields.nCondModifier = _INTERNAL::Encode_CondModifiers(it.GetConditionModifier());
-                    _INTERNAL::FillDestRegFields( fields.Dest, it.GetDest() );
+                    _INTERNAL::FillDestRegFields( fields, it.GetDest() );
                     _INTERNAL::FillSourceRegFields( fields.Src0, it.GetSource0() );
                     _INTERNAL::WriteInstructionFields2Src(pOutputBytes, fields, rInst.GetOperation() );
                 }
@@ -1677,7 +1683,7 @@ namespace GEN
                     fields.nCondModifier = _INTERNAL::Encode_CondModifiers(it.GetConditionModifier());
                     fields.IMM32 = it.GetImmediate<uint32>();
                     fields.IMM64 = it.GetImmediate<uint64>();
-                    _INTERNAL::FillDestRegFields( fields.Dest, it.GetDest() );
+                    _INTERNAL::FillDestRegFields( fields, it.GetDest() );
                     _INTERNAL::FillSourceRegFields( fields.Src0, it.GetSource0() );
                     _INTERNAL::FillSourceRegFields( fields.Src1, it.GetSource1() );
                   
@@ -1721,7 +1727,7 @@ namespace GEN
                     fields.IMM32 = it.GetImmediate<uint32>();
                     fields.IMM64 = it.GetImmediate<uint64>();
                  
-                    _INTERNAL::FillDestRegFields( fields.Dest, it.GetDest() );
+                    _INTERNAL::FillDestRegFields( fields, it.GetDest() );
                     _INTERNAL::FillSourceRegFields( fields.Src0, it.GetSource0() );
                     _INTERNAL::FillSourceRegFields( fields.Src1, it.GetSource1() );
                     
@@ -1752,7 +1758,7 @@ namespace GEN
                     if( it.IsEOT() )
                         fields.IMM32 |= 0x80000000;
 
-                    _INTERNAL::FillDestRegFields( fields.Dest, it.GetDest() );
+                    _INTERNAL::FillDestRegFields( fields, it.GetDest() );
                     _INTERNAL::FillSourceRegFields( fields.Src0, it.GetSource() );
                     if( !it.IsDescriptorInRegister() )
                         fields.Src1.dwRegFile = _INTERNAL::RF_IMM;

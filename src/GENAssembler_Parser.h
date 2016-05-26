@@ -79,7 +79,8 @@ namespace GEN
             ParseNode* DirectRegReference( TokenStruct& rToken );
             ParseNode* IndirectRegReference( TokenStruct& rGPR, TokenStruct& rAddr, int addrsub );
             ParseNode* RegRegion( size_t nLine, int v, int w, int h);
-            ParseNode* SourceReg( ParseNode* pReg, ParseNode* pRegion, ParseNode* pSubReg );
+            ParseNode* Swizzle( TokenStruct& id  );
+            ParseNode* SourceReg( ParseNode* pReg, ParseNode* pRegionOrSwizzle, ParseNode* pSubReg );
             ParseNode* DestReg( ParseNode* pReg, int hstride, ParseNode* pSubReg );
             ParseNode* FloatLiteral( size_t line, float f );
             ParseNode* IntLiteral( size_t line, int n );

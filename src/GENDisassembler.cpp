@@ -236,6 +236,16 @@ namespace GEN
                 }
                
                 FormatRegRegion( tmp, rSrc.GetDataType(), rSrc.GetRegRegion(), nExecSize );
+                if( !rSrc.GetSwizzle().IsIdentity() )
+                {
+                    const char LUT[] = "xyzw";
+                    char str[] = "(0123)";
+                    str[1] = LUT[rSrc.GetSwizzle().x];
+                    str[2] = LUT[rSrc.GetSwizzle().y];
+                    str[3] = LUT[rSrc.GetSwizzle().z];
+                    str[4] = LUT[rSrc.GetSwizzle().w];
+                    strcat(tmp,str);
+                }
             }
 
             switch( rSrc.GetModifier() )
