@@ -1,5 +1,6 @@
 
 #include <stdio.h>
+#include <string>
 
 namespace HAXWell
 {
@@ -22,3 +23,5 @@ void GetEULocalTimes(  const unsigned int* pStateRegs,
                        unsigned __int64* pLocalEndTimes );
 
 void CountOps( size_t nIsaLength, const unsigned char* pIsa, unsigned int* pALU, unsigned int* pSend );
+
+std::string ReadTextFile( const char* pPath );

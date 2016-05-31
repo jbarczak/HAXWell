@@ -6,6 +6,8 @@
 #include "GENDisassembler.h"
 #include "GENIsa.h"
 #include <map>
+#include <fstream>
+#include <string>
 
 void PrintISA( FILE* fp, HAXWell::Blob& blob )
 {
@@ -139,4 +141,21 @@ void CountOps( size_t nIsaLength, const unsigned char* pIsa, unsigned int* pALU,
 
     }
     
+}
+
+
+
+std::string ReadTextFile( const char* pPath )
+{
+    std::string str;
+    FILE* fp = fopen(pPath,"r");
+    while( !feof(fp) )
+    {
+        char c = fgetc(fp);
+        if( c != EOF )
+            str.push_back(c); // whatever
+    }
+    str.push_back(0);
+    fclose(fp);
+    return str;
 }
