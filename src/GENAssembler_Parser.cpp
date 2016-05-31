@@ -1343,19 +1343,73 @@ namespace _INTERNAL{
 
 
 
+    //=====================================================================================================================
+    //=====================================================================================================================
+    static size_t StripComments( char* p )
+    {
+        size_t nLine=1;
+        int i=0;
+        while( p[i] && p[i+1] )
+        {
+            // C++ comment.  Walk to next newline or EOF
+            if( p[i] == '/' && p[i+1] == '/' )
+            {
+                while( p[i] &&  p[i] != '\n' )
+                    p[i++] = ' ';
+                        
+                nLine++;
+            }
+            // C comment.  Walk to next */
+            else if( p[i] == '/' && p[i+1] == '*' )
+            {
+                size_t nStartLine=nLine;
+                while( p[i] != '*' || p[i+1] != '/' )
+                {
+                    if( !p[i] || !p[i+1] )
+                        return nStartLine;// EOF in unterminated C comment
+
+                    if( p[i] != '\n' )
+                        p[i] = ' ';
+                    else
+                        nLine++;
+                    i++;
+                }
+
+                p[i]   = ' ';
+                p[i+1] = ' ';
+                i += 2;
+            }
+            else
+                i++; // skip this character           
+        }
+        return 0;
+    }
+
+
     bool Parser::Parse( const char* pText, IPrinter* pErrorStream )
     {
-        m_pText = pText;
-        m_pErrorPrinter = pErrorStream;
-        m_bError = false;
-        m_nThreadsPerGroup = 1;
-        m_nCURBERegCount = 0;
-       
         if( yylex_init_extra( this, &m_scanner ) != 0 )
         {
             m_bError = true;
             return false;
         }
+
+        char* pMutableText = (char*)malloc( strlen(pText)+1 );
+        strcpy(pMutableText,pText);
+        size_t nUnterminatedCommentLine = StripComments(pMutableText);
+        if( nUnterminatedCommentLine )
+        {
+            Error(nUnterminatedCommentLine, "Unterminated block comment");
+            free(pMutableText);
+            return false;
+        }
+
+        m_pText = pMutableText;
+        m_pErrorPrinter = pErrorStream;
+        m_bError = false;
+        m_nThreadsPerGroup = 1;
+        m_nCURBERegCount = 0;
+       
 
         
         if( yyparse( this ) != 0) 
@@ -1367,7 +1421,7 @@ namespace _INTERNAL{
         }
 
         yylex_destroy( m_scanner );
-        
+        free(pMutableText);
         return !m_bError;
     }
 
