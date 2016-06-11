@@ -676,6 +676,13 @@ namespace _INTERNAL{
         else
         {
             IndirectRegRefNode* pInDir = static_cast<IndirectRegRefNode*>( pRegRef );
+
+            if( pInDir->nGPR* 32 > 512 )
+            {
+                Error(pInDir->LineNumber,"Base register for indirect addressing is too high. Must start within the first 512 bytes of reg file");
+                return 0;
+            }
+
             base = GEN::IndirectRegReference( pInDir->nGPR*32, pInDir->nAddrSubReg );
         }
         
@@ -988,6 +995,11 @@ namespace _INTERNAL{
             SourceOperand src1 = SourceFromNode(pSrc0,pOperation->nExecSize);
             SourceOperand src2 = SourceFromNode(pSrc1,pOperation->nExecSize);
             DestOperand dst = DestFromNode(pDst);
+            if( src1.IsImmediate() || src2.IsImmediate() )
+            {
+                Error(pOperation->LineNumber, "fma can't have an immediate");
+                return;
+            }
 
             SourceOperand src0 = SourceOperand(dst.GetDataType(), 
                                                RegisterRegion(dst.GetRegRegion().GetBaseRegister(),
@@ -1036,6 +1048,13 @@ namespace _INTERNAL{
         ErrorF( pOperation->LineNumber, "Unrecognized instruction: '%s'", pOperation->pName );
     }
 
+    static const TokenID TERNARY_ARITH[] = {
+        {"bfe"   , OP_BFE },
+        {"fma"   , OP_FMA },
+        {"lrp"   , OP_LRP },
+        {0,0}
+    };
+
     void Parser::Ternary( ParseNode* pOp, ParseNode* pDst, ParseNode* pSrc0, ParseNode* pSrc1, ParseNode* pSrc2  )
     {
         if( !pOp || !pDst || !pSrc0 || !pSrc1 || !pSrc2 )
@@ -1043,17 +1062,31 @@ namespace _INTERNAL{
         
         OperationNode* pOperation = static_cast<OperationNode*>(pOp);
 
-        
-        ErrorF( pOperation->LineNumber, "Unrecognized instruction: '%s'", pOperation->pName );
+        const TokenID* pID = Lookup( TERNARY_ARITH, pOperation->pName );
+        if( pID )
+        {
+            GEN::SourceOperand src0 = SourceFromNode(pSrc0,pOperation->nExecSize);
+            GEN::SourceOperand src1 = SourceFromNode(pSrc1,pOperation->nExecSize);
+            GEN::SourceOperand src2 = SourceFromNode(pSrc2,pOperation->nExecSize);
+            if( src0.IsImmediate() || src1.IsImmediate() || src2.IsImmediate() )
+            {
+                Error(pOperation->LineNumber, "Ternaries can't have immediates");
+                return;
+            }
 
-        // TODO
-        /*
-           // ternaries
-     return "bfe"    ;
-     return "fma"    ;
-     return "lrp"    ;
-     "csel"
-     */
+            m_Instructions.push_back( 
+                GEN::TernaryInstruction( pOperation->nExecSize, (Operations)pID->ID, 
+                    DestFromNode(pDst), 
+                    src0,
+                    src1,
+                    src2
+                    )
+                );
+            return;
+        }
+
+        ErrorF( pOperation->LineNumber, "Unrecognized instruction: '%s'", pOperation->pName );
+        return;
     }
 
     void Parser::Send( TokenStruct& msg, TokenStruct& bind, ParseNode* pDst0, ParseNode* pDst1 )
