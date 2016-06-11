@@ -919,6 +919,16 @@ namespace _INTERNAL{
         { 0, 0 }
     };
 
+    static bool HasRegioning( ParseNode* pN )
+    {
+        SourceNode* pSrcNode = static_cast<SourceNode*>(pN);
+        if( pSrcNode->IsImmediate() )
+            return false;
+        SourceRegNode* pReg = static_cast<SourceRegNode*>(pN);
+        if( !pReg->pRegionOrSwizzle || pReg->pRegionOrSwizzle->IsSwizzle() )
+            return false;
+        return true;
+    }
 
     void Parser::Binary( ParseNode* pOp, ParseNode* pDst, ParseNode* pSrc0, ParseNode* pSrc1 )
     {
@@ -1000,6 +1010,11 @@ namespace _INTERNAL{
                 Error(pOperation->LineNumber, "fma can't have an immediate");
                 return;
             }
+            if( HasRegioning( pSrc0 ) || HasRegioning(pSrc1) )
+            {
+                Error( pOperation->LineNumber, "Region description not allowed on ternary ops");
+                return;
+            }
 
             SourceOperand src0 = SourceOperand(dst.GetDataType(), 
                                                RegisterRegion(dst.GetRegRegion().GetBaseRegister(),
@@ -1071,6 +1086,12 @@ namespace _INTERNAL{
             if( src0.IsImmediate() || src1.IsImmediate() || src2.IsImmediate() )
             {
                 Error(pOperation->LineNumber, "Ternaries can't have immediates");
+                return;
+            }
+
+            if( HasRegioning( pSrc0 ) || HasRegioning(pSrc1) || HasRegioning(pSrc2) )
+            {
+                Error( pOperation->LineNumber, "Reg regioning not allowed on ternary ops");
                 return;
             }
 
