@@ -118,7 +118,7 @@ namespace GEN
             case DT_U8:     nByteOffset /= 1; break;
             case DT_S8:     nByteOffset /= 1; break;
             case DT_F64:    nByteOffset /= 8; break;
-            case DT_F32:    nByteOffset /= 8; break;
+            case DT_F32:    nByteOffset /= 4; break;
             default:        nByteOffset = 0; break;
             }
 
