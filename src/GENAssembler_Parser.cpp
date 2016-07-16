@@ -19,7 +19,10 @@ namespace _INTERNAL{
     {
         SubRegNode( size_t line ) : ParseNode(line){}
         DataTypes eType;
-        size_t nSubreg;
+        size_t nSubregOffset;
+        size_t nRegDisplacement; // number of whole regs to skip
+                                 //  we allow out of range sub-reg numbers and fix them up
+                                 //  for readability's sake
     };
     struct RegRefNode : public ParseNode
     {
@@ -366,6 +369,7 @@ namespace _INTERNAL{
         }
 
         size_t nSubreg = 0;
+        size_t nRegDisplacement=0;
         if( *pSuffix != 0 )
         {
             // parse an unsigned integer sub-reg offset
@@ -393,10 +397,13 @@ namespace _INTERNAL{
             case GEN::DT_F64:  nSubreg *= 8; break;
             case GEN::DT_F32:  nSubreg *= 4; break;
             }
-            if( nSubreg >= 32 )
+
+            // if user indexes the reg out of range
+            //  then we'll fix it for them by adjusting the reg number
+            while( nSubreg >= 32 )
             {
-                Error( rToken.LineNumber, "Sub-reg number out of range" );
-                return 0;
+                nRegDisplacement++;
+                nSubreg -= 32;
             }
         }
        
@@ -404,7 +411,8 @@ namespace _INTERNAL{
         SubRegNode* pN = new SubRegNode(rToken.LineNumber);
         m_Nodes.push_back(pN);
         pN->eType = eType;
-        pN->nSubreg = nSubreg;
+        pN->nSubregOffset = nSubreg;
+        pN->nRegDisplacement = nRegDisplacement;
         return pN;
     }
 
@@ -639,7 +647,14 @@ namespace _INTERNAL{
         if( pRegRef->bIsDirect )
         {
             DirectRegRefNode* pDir = static_cast<DirectRegRefNode*>( pRegRef);
-            base = GEN::DirectRegReference( pDir->eRegType, pDir->nRegNum, pSub->nSubreg );
+            size_t nRegNum = pDir->nRegNum + pSub->nRegDisplacement;
+            if( nRegNum >= 128 )
+            {
+                Error(pRegRef->LineNumber, "Out of range reg reference");
+                return 0;
+            }
+
+            base = GEN::DirectRegReference( pDir->eRegType, nRegNum, pSub->nSubregOffset );
         }
         else
         {
@@ -671,7 +686,13 @@ namespace _INTERNAL{
         if( pRegRef->bIsDirect )
         {
             DirectRegRefNode* pDir = static_cast<DirectRegRefNode*>( pRegRef);
-            base = GEN::DirectRegReference( pDir->eRegType, pDir->nRegNum, pSub->nSubreg );
+            size_t nRegNum = pDir->nRegNum + pSub->nRegDisplacement;
+            if( nRegNum >= 128 )
+            {
+                Error(pRegRef->LineNumber, "Out of range reg reference");
+                return 0;
+            }
+            base = GEN::DirectRegReference( pDir->eRegType, nRegNum, pSub->nSubregOffset );
         }
         else
         {
