@@ -486,7 +486,7 @@ namespace _INTERNAL{
                 // now make sure user didn't screw up
                 if( offset >= m_NamedRegs[i].nRegArraySize )
                 {
-                    Error(rToken.LineNumber, "Overrun of named register block");
+                    ErrorF(rToken.LineNumber, "Overrun of named register %s", pReg);
                     return false;
                 }
             }
