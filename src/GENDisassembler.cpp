@@ -199,8 +199,8 @@ namespace GEN
                 case DT_S16:    sprintf(tmp, "%d", rInstruction.GetImmediate<int16>());  break;
                 case DT_U8:     sprintf(tmp, "%u", rInstruction.GetImmediate<uint8>());  break;
                 case DT_S8:     sprintf(tmp, "%d", rInstruction.GetImmediate<int8>());   break;
-                case DT_F64:    sprintf(tmp, "%f", rInstruction.GetImmediate<float>());  break;
-                case DT_F32:    sprintf(tmp, "%f", rInstruction.GetImmediate<double>()); break;
+                case DT_F64:    sprintf(tmp, "%f", rInstruction.GetImmediate<double>());  break;
+                case DT_F32:    sprintf(tmp, "%f", rInstruction.GetImmediate<float>()); break;
                 case DT_VEC_HALFBYTE_UINT:  
                     {
                         unsigned int pVals[8];
