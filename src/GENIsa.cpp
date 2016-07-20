@@ -267,6 +267,39 @@ namespace GEN
         return write;
     }
    
+
+    SendInstruction UntypedRead_SIMD8x4( uint32 nBindTableIndex, GEN::RegReference addr, GEN::RegReference writeCommit )
+    {
+        uint32 dwDescriptor = 0;
+        dwDescriptor  = (0x1<<25); // message length (1 gpr)
+        dwDescriptor |= (4<<20);   // response length (4 gpr)
+        dwDescriptor |= 0x1<<14;   // message type (untyped surface read)
+        dwDescriptor |= 0x20<<8;   // SIMD8 untyped read message, all channels read
+        dwDescriptor |=  (nBindTableIndex&0xff);
+
+        
+        SendInstruction write( 16,SFID_DP_DC1, dwDescriptor,
+                               DestOperand( DT_U32, RegisterRegion(writeCommit,8,8,1)),
+                                SourceOperand( DT_U32,  RegisterRegion( addr,8,8,1)) );
+        return write;
+    }
+    
+    SendInstruction UntypedRead_SIMD16x4( uint32 nBindTableIndex, GEN::RegReference addr, GEN::RegReference writeCommit )
+    {
+        uint32 dwDescriptor = 0;
+        dwDescriptor  = (0x2<<25); // message length (2 gpr)
+        dwDescriptor |= (8<<20);   // response length (8 gpr)
+        dwDescriptor |= 0x1<<14;   // message type (untyped surface read)
+        dwDescriptor |= 0x10<<8;   // SIMD15 untyped read message, all channels read
+        dwDescriptor |=  (nBindTableIndex&0xff);
+
+        
+        SendInstruction write( 16,SFID_DP_DC1, dwDescriptor,
+                               DestOperand( DT_U32, RegisterRegion(writeCommit,8,8,1)),
+                                SourceOperand( DT_U32,  RegisterRegion( addr,8,8,1)) );
+        return write;
+    }
+
     SendInstruction UntypedWrite_SIMD16x2( uint32 nBindTableIndex, GEN::RegReference addr, GEN::RegReference writeCommit )
     {
         uint32 dwDescriptor = 0;

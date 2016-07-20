@@ -1166,6 +1166,14 @@ namespace _INTERNAL{
         {
             m_Instructions.push_back( GEN::UntypedWrite_SIMD16x2( pBind->bind, Dst1Reg, Dst0Reg ) );
         }
+        else if( strcmp( msg.fields.ID, "UntypedRead8x4" ) == 0 )
+        {
+            m_Instructions.push_back( GEN::UntypedRead_SIMD8x4( pBind->bind, Dst1Reg, Dst0Reg ) );
+        }
+        else if( strcmp( msg.fields.ID, "UntypedRead16x4" ) == 0 )
+        {
+            m_Instructions.push_back( GEN::UntypedRead_SIMD16x4( pBind->bind, Dst1Reg, Dst0Reg ) );
+        }
         else if( strcmp( msg.fields.ID, "OWordBlockWrite" ) == 0 )
         {
             m_Instructions.push_back( GEN::OWordBlockWrite( pBind->bind, Dst1Reg ) );
