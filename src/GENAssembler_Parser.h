@@ -94,7 +94,7 @@ namespace GEN
             void Jmp( TokenStruct& label );
             void JmpIf( TokenStruct& label, ParseNode* pFlagRef, bool bInvert );
             
-            void BeginPredBlock( ParseNode* pFlagRef );
+            void BeginPredBlock( ParseNode* pFlagRef, bool bInvert );
             void EndPredBlock();
 
 
@@ -171,6 +171,7 @@ namespace GEN
 
             size_t m_nPredStart;
             ParseNode* m_pPred;
+            bool m_bPredBlockInvert;
            
             
         };

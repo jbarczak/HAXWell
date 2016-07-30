@@ -1207,10 +1207,15 @@ namespace _INTERNAL{
         m_Instructions.push_back( Instruction() ); // reserve a spot
     }
     
-    void Parser::BeginPredBlock( ParseNode* pFlagRef )
+    void Parser::BeginPredBlock( ParseNode* pFlagRef, bool bInvert )
     {
+        if( m_pPred )
+            Error(pFlagRef->LineNumber, "Can't nest pred blocks");
+         
+        
         m_nPredStart= m_Instructions.size();
         m_pPred = pFlagRef;
+        m_bPredBlockInvert = bInvert;
     }
 
     void Parser::EndPredBlock()
@@ -1218,7 +1223,7 @@ namespace _INTERNAL{
         FlagReferenceNode* pFlag = static_cast<FlagReferenceNode*>( m_pPred );
 
         Predicate pred;
-        pred.Set( GEN::PM_SEQUENTIAL_FLAG, false );
+        pred.Set( GEN::PM_SEQUENTIAL_FLAG, m_bPredBlockInvert );
 
         while( m_nPredStart < m_Instructions.size() )
         {
@@ -1226,10 +1231,14 @@ namespace _INTERNAL{
             m_Instructions[m_nPredStart].SetFlagReference(pFlag->Flag);
             m_nPredStart++;
         }
+
+        m_pPred=0;
     }
 
     bool Parser::Begin( size_t line )
     {
+        m_pPred=0;
+
         // after the pre-amble is done, allocate registers for all 'reg' declarations
         //   We allow mixing of 'reg' and 'curbe' in the pre-amble, so we need to defer
         //  the assignment of 'reg' regs until all the curbes are known

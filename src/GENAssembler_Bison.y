@@ -163,7 +163,8 @@ predicate_block:
 ;
 
 predicate_block_header:
-    T_KW_PRED '(' flag_ref ')'  { pParser->BeginPredBlock( $3.fields.node ); }
+    T_KW_PRED '(' flag_ref ')'      { pParser->BeginPredBlock( $3.fields.node,false ); }
+|   T_KW_PRED '(' '~' flag_ref ')'  { pParser->BeginPredBlock( $3.fields.node,true ); }
 ;
 
 block_instruction_list:
