@@ -9,6 +9,7 @@ namespace HAXWell
     typedef void* ShaderHandle;
     typedef void* BufferHandle;
     typedef void* TimerHandle;
+    typedef void* FenceHandle;
     typedef unsigned int timer_t;
 
     struct ShaderArgs
@@ -55,7 +56,11 @@ namespace HAXWell
     timer_t ReadTimer( TimerHandle hTimer );
 
     void DispatchShader( ShaderHandle hShader, BufferHandle* pBuffers, size_t nBuffers, size_t nThreadGroups );
+    void Flush();
     void Finish();
+
+    FenceHandle BeginFence();
+    void WaitFence( FenceHandle hFence );
 
     /// Compile GLSL and extract its ISA
     bool RipIsaFromGLSL( Blob& blob, const char* pGLSL );

@@ -26,8 +26,16 @@
 #define GL_TIME_ELAPSED                   0x88BF
 #define GL_QUERY_RESULT                   0x8866
 
+#define GL_SYNC_GPU_COMMANDS_COMPLETE     0x9117
+#define GL_TIMEOUT_EXPIRED                0x911B
+#define GL_CONDITION_SATISFIED            0x911C
+#define GL_WAIT_FAILED                    0x911D
+#define GL_TIMEOUT_IGNORED                0xFFFFFFFFFFFFFFFFull
+
 void OpcodeWalk( void* pBuffer, size_t nBufferSize );
 
+typedef struct __GLsync *GLsync;
+typedef unsigned __int64 GLuint64;
 
 namespace HAXWell
 {
@@ -95,6 +103,13 @@ namespace HAXWell
  	    GLenum pname,
  	    GLuint * params);
 
+    typedef GLsync (__stdcall* PFENCESYNC)(	GLenum condition, GLbitfield flags );
+    typedef GLenum (__stdcall* PWAITSYNC)(	GLsync sync,
+ 	                                        GLbitfield flags,
+ 	                                        GLuint64 timeout);
+    typedef void (__stdcall* PDELETESYNC)( GLsync sync );
+
+
     PCREATESHADER           glCreateShader;
     PSHADERSOURCE           glShaderSource;
     PCOMPILESHADER          glCompileShader;
@@ -128,6 +143,10 @@ namespace HAXWell
     PBEGINQUERY        glBeginQuery;
     PENDQUERY          glEndQuery;
     PGETQUERYOBJECTUIV glGetQueryObjectuiv;
+
+    PFENCESYNC glFenceSync;
+    PWAITSYNC glClientWaitSync;
+    PDELETESYNC glDeleteSync;
 
 
     void __stdcall glDebugProc( GLenum source, GLenum type, GLuint id,
@@ -281,6 +300,10 @@ namespace HAXWell
         glBeginQuery            = (PBEGINQUERY)         wglGetProcAddress( "glBeginQuery" );
         glEndQuery              = (PENDQUERY)           wglGetProcAddress( "glEndQuery" );
         glGetQueryObjectuiv     = (PGETQUERYOBJECTUIV)  wglGetProcAddress( "glGetQueryObjectuiv" );
+
+        glFenceSync             = (PFENCESYNC)  wglGetProcAddress("glFenceSync");
+        glClientWaitSync        = (PWAITSYNC)   wglGetProcAddress("glClientWaitSync");
+        glDeleteSync            = (PDELETESYNC) wglGetProcAddress("glDeleteSync");
 
         glEnable(GL_DEBUG_OUTPUT);
 
@@ -446,6 +469,24 @@ namespace HAXWell
     void Finish()
     {
         glFinish();
+    }
+
+    void Flush()
+    {
+        glFlush();
+    }
+
+    FenceHandle BeginFence()
+    {
+        return (FenceHandle) glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE,0);
+    }
+
+    void WaitFence( FenceHandle hFence )
+    {
+        while( glClientWaitSync( (GLsync)hFence, 0, 1000000 ) == GL_TIMEOUT_EXPIRED )
+            ;
+
+        glDeleteSync((GLsync)hFence);
     }
 
     bool RipIsaFromGLSL( Blob& rBlob, const char* pGLSL )
