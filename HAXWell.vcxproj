@@ -69,12 +69,17 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>.\include</AdditionalIncludeDirectories>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <FloatingPointModel>Fast</FloatingPointModel>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>opengl32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -84,6 +89,14 @@
     <ClCompile Include="BlockReadCost.cpp" />
     <ClCompile Include="BlockVsScatterReads.cpp" />
     <ClCompile Include="Nbody.cpp" />
+    <ClCompile Include="raytracer\Harness.cpp">
+      <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">AssemblyAndSourceCode</AssemblerOutput>
+    </ClCompile>
+    <ClCompile Include="raytracer\Matrix.cpp" />
+    <ClCompile Include="raytracer\PlyLoader.cpp" />
+    <ClCompile Include="raytracer\PPMImage.cpp" />
+    <ClCompile Include="raytracer\Raytracer.cpp" />
+    <ClCompile Include="raytracer\rply.c" />
     <ClCompile Include="ScatteredReadCost.cpp" />
     <ClCompile Include="InstructionCacheCliff.cpp" />
     <ClCompile Include="Misc.cpp" />
@@ -108,6 +121,10 @@
     <ClInclude Include="include\HAXWell.h" />
     <ClInclude Include="include\HAXWell_Utils.h" />
     <ClInclude Include="Misc.h" />
+    <ClInclude Include="raytracer\Matrix.h" />
+    <ClInclude Include="raytracer\PlyLoader.h" />
+    <ClInclude Include="raytracer\PPMImage.h" />
+    <ClInclude Include="raytracer\rply.h" />
     <ClInclude Include="src\autogen\GENAssembler_Bison.hpp" />
     <ClInclude Include="src\GENAssembler_Parser.h" />
   </ItemGroup>
@@ -136,6 +153,14 @@
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)src\autogen\GENAssembler_Bison.cpp;$(SolutionDir)src\autogen\GENAssembler_Bison.hpp</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)src\autogen\GENAssembler_Bison.cpp;$(SolutionDir)src\autogen\GENAssembler_Bison.hpp</Outputs>
     </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="raytracer\eight_ray.inl" />
+    <None Include="raytracer\raytracer.glsl" />
+    <None Include="raytracer\single_ray.inl" />
+    <None Include="raytracer\single_ray_qbvh.inl" />
+    <None Include="raytracer\single_ray_vectri_x16.inl" />
+    <None Include="raytracer\single_ray_vectri_x8.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

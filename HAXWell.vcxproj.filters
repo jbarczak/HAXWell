@@ -10,6 +10,9 @@
     <Filter Include="src\autogen">
       <UniqueIdentifier>{fbae03fa-f5fa-47f5-a673-3557949d846a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="raytracer">
+      <UniqueIdentifier>{cf260477-454b-409c-8846-dc7a67ee204a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\HAXWell.h">
@@ -36,6 +39,18 @@
     </ClInclude>
     <ClInclude Include="include\GENAssembler.h">
       <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="raytracer\PlyLoader.h">
+      <Filter>raytracer</Filter>
+    </ClInclude>
+    <ClInclude Include="raytracer\PPMImage.h">
+      <Filter>raytracer</Filter>
+    </ClInclude>
+    <ClInclude Include="raytracer\rply.h">
+      <Filter>raytracer</Filter>
+    </ClInclude>
+    <ClInclude Include="raytracer\Matrix.h">
+      <Filter>raytracer</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -78,6 +93,24 @@
     <ClCompile Include="AssemblerTest.cpp" />
     <ClCompile Include="BCCompress.cpp" />
     <ClCompile Include="BlockMinMax.cpp" />
+    <ClCompile Include="raytracer\Raytracer.cpp">
+      <Filter>raytracer</Filter>
+    </ClCompile>
+    <ClCompile Include="raytracer\PlyLoader.cpp">
+      <Filter>raytracer</Filter>
+    </ClCompile>
+    <ClCompile Include="raytracer\PPMImage.cpp">
+      <Filter>raytracer</Filter>
+    </ClCompile>
+    <ClCompile Include="raytracer\rply.c">
+      <Filter>raytracer</Filter>
+    </ClCompile>
+    <ClCompile Include="raytracer\Harness.cpp">
+      <Filter>raytracer</Filter>
+    </ClCompile>
+    <ClCompile Include="raytracer\Matrix.cpp">
+      <Filter>raytracer</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="src\GENAssembler_Bison.y">
@@ -86,5 +119,25 @@
     <CustomBuild Include="src\GENAssembler_Flex.l">
       <Filter>src</Filter>
     </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="raytracer\raytracer.glsl">
+      <Filter>raytracer</Filter>
+    </None>
+    <None Include="raytracer\single_ray.inl">
+      <Filter>raytracer</Filter>
+    </None>
+    <None Include="raytracer\single_ray_qbvh.inl">
+      <Filter>raytracer</Filter>
+    </None>
+    <None Include="raytracer\eight_ray.inl">
+      <Filter>raytracer</Filter>
+    </None>
+    <None Include="raytracer\single_ray_vectri_x8.inl">
+      <Filter>raytracer</Filter>
+    </None>
+    <None Include="raytracer\single_ray_vectri_x16.inl">
+      <Filter>raytracer</Filter>
+    </None>
   </ItemGroup>
 </Project>

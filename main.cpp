@@ -16,7 +16,7 @@ void BlockReadTest();
 void ScatteredReadTest();
 void ScatterVsGather();
 void Nbody();
-
+void Raytrace();
 
 
 void AssemblerTest();
@@ -61,7 +61,8 @@ int main( int argc, char* argv[] )
       InstructionIssueTest(1,16); 
       */
    
-    Nbody();
+    Raytrace();
+    //Nbody();
     //BlockMinMax();
     
    // AssemblerTest();
